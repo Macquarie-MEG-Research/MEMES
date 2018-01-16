@@ -27,11 +27,6 @@ cd(dir_name); fprintf('\n CDd to the right place\n');
 
 addpath('/Users/44737483/Documents/scripts_mcq/alien');
 
-elpfile = '/Users/44737483/Documents/mcq_data/2721/meg/2721_CM_ME160_2017_10_09.elp';
-hspfile = '/Users/44737483/Documents/mcq_data/2721/meg/2721_CM_ME160_2017_10_09.hsp';
-confile = '/Users/44737483/Documents/mcq_data/2721/meg/run-alien/2721_CM_ME160_2017_10_09_aliens.con';
-mrkfile = '/Users/44737483/Documents/mcq_data/2721/meg/run-rs/2721_CM_ME160_2017_10_09_rs_PRE.mrk';
-
 % Get Polhemus Points
 [shape] = parsePolhemus(elpfile,hspfile);
 
