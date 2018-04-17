@@ -4,7 +4,9 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function MEMES(dir_name,elpfile,hspfile,confile,mrkfile,path_to_MRI_library,mesh_library,initial_mri_realign)
+function MEMES(dir_name,elpfile,hspfile,confile,mrkfile,path_to_MRI_library,mesh_library,initial_mri_realign,bad_coil)
+
+assert(length(bad_coil)<3)
 
 % list of HCP subjects
 subject = {'100307';'102816';'104012';'105923';'106521';'108323';...
@@ -25,7 +27,7 @@ subject = {'100307';'102816';'104012';'105923';'106521';'108323';...
 % CD to right place
 cd(dir_name); fprintf('\n CDd to the right place\n');
 
-addpath('/Users/44737483/Documents/scripts_mcq/alien');
+%addpath('/Users/44737483/Documents/scripts_mcq/alien');
 
 % Get Polhemus Points
 [shape] = parsePolhemus(elpfile,hspfile);
@@ -33,45 +35,81 @@ addpath('/Users/44737483/Documents/scripts_mcq/alien');
 % Read the grads from the con file
 grad_con                    = ft_read_sens(confile); %in cm, load grads
 
-% Read the mrk file
+%% Perform Realighment Using Paul's Fancy Functions
+if isempty(bad_coil)
 mrk                         = ft_read_headshape(mrkfile,'format','yokogawa_mrk');
 markers                     = mrk.fid.pos([2 3 1 4 5],:);%reorder mrk to match order in shape
 [R,T,Yf,Err]                = rot3dfit(markers,shape.fid.pnt(4:end,:));%calc rotation transform
 meg2head_transm             = [[R;T]'; 0 0 0 1];%reorganise and make 4*4 transformation matrix
 
-% Transform sensors based on the MRKfile
-grad_trans      = ft_transform_geometry_PFS_hacked(meg2head_transm,grad_con); %Use my hacked version of the ft function - accuracy checking removed not sure if this is good or not
-grad_trans.fid  = shape; %add in the head information
-% Rotate about z-axis
+grad_trans                  = ft_transform_geometry_PFS_hacked(meg2head_transm,grad_con); %Use my hacked version of the ft function - accuracy checking removed not sure if this is good or not
+grad_trans.fid              = shape; %add in the head information
+save grad_trans grad_trans
+
+% Else if there is a bad marker
+else
+    fprintf(''); disp('TAKING OUT BAD MARKER(S)');
+    
+    % Identify the bad coil
+    badcoilpos = find(ismember(shape.fid.label,bad_coil{1}));
+    
+
+    % Take away the bad marker
+    marker_order = [2 3 1 4 5];
+    
+    mrk                         = ft_read_headshape(mrkfile,'format','yokogawa_mrk');
+    markers                     = mrk.fid.pos(marker_order,:);%reorder mrk to match order in shape
+    % Now take out the bad marker when you realign
+    markers(badcoilpos-3,:) = [];
+    
+    fids_2_use = shape.fid.pnt(4:end,:); fids_2_use(badcoilpos-3,:) = [];
+    
+    % If there is a second bad coil remove this now
+    if length(bad_coil) == 2
+        badcoilpos2 = find(ismember(shape.fid.label,bad_coil{2}));
+        markers(badcoilpos2-4,:) = [];
+        fids_2_use(badcoilpos2-4,:) = [];
+    end
+
+    [R,T,Yf,Err]                = rot3dfit(markers,fids_2_use);%calc rotation transform
+    meg2head_transm             = [[R;T]'; 0 0 0 1];%reorganise and make 4*4 transformation matrix
+
+    grad_trans                  = ft_transform_geometry_PFS_hacked(meg2head_transm,grad_con); %Use my hacked version of the ft function - accuracy checking removed not sure if this is good or not
+    grad_trans.fid              = shape; %add in the head information
+end
+
+
+% Get headshape downsampled to 100 points with facial info preserved
+headshape_downsampled = downsample_headshape(hspfile,100,grad_trans);
+
+% Rotate sensors and headshape about z-axis
 rot180mat       = rotate_about_z(180);
 grad_trans      = ft_transform_geometry(rot180mat,grad_trans);
-
-% Get headshape downsampled to 100 points with facial info removed
-headshape_downsampled = downsample_headshape_noface(hspfile,100,grad_trans);
-% Rotate about z-axis
 headshape_downsampled = ft_transform_geometry(rot180mat,headshape_downsampled);
 
 %% Perform ICP
 
 % Error term variable
-error_term = zeros(1,length(mesh_library)); 
+error_term = zeros(1,length(mesh_library));
 % Variable to hold the transformation matrices
-trans_matrix_library = [];
+trans_matrix_library = []; count = 1;
 
 for m = 1:length(mesh_library)
-
-numiter = 50; fprintf('Completed iteration %d of %d\n',m,length(mesh_library));
-
-% Perform ICP
-[R, t, err, dummy, info] = icp(mesh_library{m}.pos', headshape_downsampled.pos', numiter, 'Minimize', 'plane', 'Extrapolation', true,'WorstRejection', 0.05);
-
-% Add error to error_term
-error_term(m) = err(end);
-
-% Add transformation matrix to trans_matrix_library
-trans_matrix_library{m} = inv([real(R) real(t);0 0 0 1]);
-
+    
+    fprintf('Completed iteration %d of %d\n',m,length(mesh_library));
+    
+    numiter = 50;
+    
+    % Perform ICP
+    [R, t, err, dummy, info] = icp(mesh_library{m}.pos', headshape_downsampled.pos', numiter, 'Minimize', 'plane', 'Extrapolation', true,'WorstRejection', 0.05);
+    
+    % Add error to error_term
+    error_term(m) = err(end);
+    
+    % Add transformation matrix to trans_matrix_library
+    trans_matrix_library{m} = inv([real(R) real(t);0 0 0 1]);
 end
+
 
 %% Make pretty figure
 error_term_sorted = sort(error_term, 'descend');
@@ -108,7 +146,7 @@ end
 
 %% Use the best for to create a source model for MEG source analysis
 
-winner = find(error_term == min(error_term));
+winner = find(error_term == min(min(error_term)));
 fprintf('\nThe winning MRI is number %d of %d\n',winner,length(mesh_library));
 trans_matrix = trans_matrix_library{winner};
 
@@ -135,8 +173,9 @@ try
     CaptureFigVid([0,0; 360,0], 'ICP_quality',OptionZ)
     
 catch
-    printf('You need CaptureFigVid in your path for fancy videos\n');
+    fprintf('You need CaptureFigVid in your path for fancy videos\n');
 end
+
 
 % Get MRI of winning subject
 mri_file = [path_to_MRI_library subject{winner} '/MEG/anatomy/T1w_acpc_dc_restore.nii.gz'];
@@ -145,7 +184,7 @@ mri_orig                    = ft_read_mri(mri_file); % in mm, read in mri from D
 mri_orig = ft_convert_units(mri_orig,'cm'); mri_orig.coordsys = 'neuromag';
 
 mri_orig.transform = initial_mri_realign{winner};
-mri_realigned = mri_orig; clear mri_orig;
+mri_realigned = mri_orig;
 
 % Segment
 fprintf('\nSegmenting the MRI... This may take a while...\n');
@@ -163,11 +202,38 @@ headmodel_singleshell = ft_prepare_headmodel(cfg, mri_segmented); % in cm, creat
 headmodel_singleshell.bnd.pos = ft_warp_apply(trans_matrix,headmodel_singleshell.bnd.pos);
 
 figure;ft_plot_headshape(headshape_downsampled) %plot headshape
-ft_plot_sens(grad_trans, 'style', 'k*')
+ft_plot_sens(grad_trans, 'style', 'k*');
 ft_plot_vol(headmodel_singleshell,  'facecolor', 'cortex', 'edgecolor', 'none');alpha 1; camlight
 view([90,0]); title('After Coreg');
 print('headmodel_quality','-dpdf');
 
+%% Create coregistered 3D cortical mesh
+mesh = ft_read_headshape({[path_to_MRI_library ...
+    subject{winner} '/MEG/anatomy/' subject{winner} '.L.midthickness.4k_fs_LR.surf.gii'],...
+    [path_to_MRI_library subject{winner} '/MEG/anatomy/' subject{winner} ...
+    '.R.midthickness.4k_fs_LR.surf.gii']});
+
+mesh = ft_convert_units(mesh,'cm');
+
+% Re-load mri_orig
+mri_orig                    = ft_read_mri(mri_file); % in mm, read in mri from DICOM
+mri_orig = ft_convert_units(mri_orig,'cm'); mri_orig.coordsys = 'neuromag';
+
+% Transform 1 (MESH --> coreg via manual marking of fiducial points)
+mesh.pos = ft_warp_apply(inv(mri_orig.transform),mesh.pos);
+mesh.pos = ft_warp_apply(initial_mri_realign{winner},mesh.pos);
+
+%transform 2 (MESH --> coreg via ICP adjustment)
+mesh.pos = ft_warp_apply(trans_matrix,mesh.pos);
+
+
+%ft_determine_coordsys(mri_realigned2,'interactive','no'); hold on;
+figure;ft_plot_sens(grad_trans);
+ft_plot_headshape(headshape_downsampled) %plot headshape
+ft_plot_mesh(mesh,'facealpha',0.8); camlight; hold on; view([100 4]);
+print('headmodel_3D_cortical_mesh_quality','-dpdf');
+
+%% SAVE
 fprintf('\nSaving the necessary data\n');
 
 
@@ -469,7 +535,78 @@ fprintf('\nCOMPLETED - check the output for quality control\n');
         rmatx = [cos(deg) sin(deg) 0 0;-sin(deg) cos(deg) 0 0;0 0 1 0;0 0 0 1];
     end
 
-    function [headshape_downsampled] = downsample_headshape_noface(path_to_headshape,numvertices,sensors)
+%     function [headshape_downsampled] = downsample_headshape_noface(path_to_headshape,numvertices,sensors)
+%         % Get headshape
+%         headshape = ft_read_headshape(path_to_headshape);
+%         % Convert to cm
+%         headshape = ft_convert_units(headshape,'cm');
+%         % Convert to BESA co-ordinates
+%         headshape.pos = cat(2,fliplr(headshape.pos(:,1:2)),headshape.pos(:,3));
+%         headshape.pos(:,2) = headshape.pos(:,2).*-1;
+%         
+%         % Get indices of facial points (up to 4cm above nasion)
+%         
+%         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%         % Is 4cm the correct distance?
+%         % Possibly different for child system?
+%         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%         
+%         count_facialpoints = find(headshape.pos(:,3)<4);
+%         if isempty(count_facialpoints)
+%             disp('CANNOT FIND ANY FACIAL POINTS');
+%         else
+%             facialpoints = headshape.pos(count_facialpoints,:,:);
+%             rrr = 1:4:length(facialpoints);
+%             facialpoints = facialpoints(rrr,:); clear rrr;
+%         end
+%         
+%         % Remove facial points for now
+%         headshape.pos(count_facialpoints,:) = [];
+%         
+%         % Create mesh out of headshape downsampled to x points specified in the
+%         % function call
+%         cfg.numvertices = numvertices;
+%         cfg.method = 'headshape';
+%         cfg.headshape = headshape.pos;
+%         mesh = ft_prepare_mesh(cfg, headshape);
+%         
+%         % Replace the headshape info with the mesh points
+%         headshape.pos = mesh.pos;
+%         
+%         % Create figure for quality checking
+%         figure; subplot(2,2,1);ft_plot_mesh(mesh); hold on;
+%         title('Downsampled Mesh');
+%         view(0,0);
+%         subplot(2,2,2);ft_plot_mesh(headshape); hold on;
+%         title('Downsampled Headshape View 1');
+%         view(0,0);
+%         subplot(2,2,3);ft_plot_mesh(headshape); hold on;
+%         title('Downsampled Headshape View 2');
+%         view(90,0);
+%         subplot(2,2,4);ft_plot_mesh(headshape); hold on;
+%         title('Downsampled Headshape View 3');
+%         view(180,0);
+%         print('headshape_quality','-dpdf');
+%         
+%         % Add in names of the fiducials from the sensor
+%         headshape.fid.label = {'NASION','LPA','RPA'};
+%         
+%         % Convert fiducial points to BESA
+%         headshape.fid.pos = cat(2,fliplr(headshape.fid.pos(:,1:2)),headshape.fid.pos(:,3));
+%         headshape.fid.pos(:,2) = headshape.fid.pos(:,2).*-1;
+%         
+%         % Plot for quality checking
+%         figure;ft_plot_sens(sensors) %plot channel position : between the 1st and 2nd coils
+%         ft_plot_headshape(headshape) %plot headshape
+%         view(0,0);
+%         print('headshape_quality2','-dpdf');
+%         
+%         % Export filename
+%         headshape_downsampled = headshape;
+%         
+%     end
+
+    function [headshape_downsampled] = downsample_headshape(path_to_headshape,numvertices,sensors)
         % Get headshape
         headshape = ft_read_headshape(path_to_headshape);
         % Convert to cm
@@ -487,7 +624,7 @@ fprintf('\nCOMPLETED - check the output for quality control\n');
         
         count_facialpoints = find(headshape.pos(:,3)<4);
         if isempty(count_facialpoints)
-            disp('CANNOT FIND ANY FACIAL POINTS');
+            disp('CANNOT FIND ANY FACIAL POINTS - COREG BY ICP MAY BE INACCURATE');
         else
             facialpoints = headshape.pos(count_facialpoints,:,:);
             rrr = 1:4:length(facialpoints);
@@ -522,6 +659,8 @@ fprintf('\nCOMPLETED - check the output for quality control\n');
         view(180,0);
         print('headshape_quality','-dpdf');
         
+        % Add the facial info back in
+        headshape.pos = vertcat(headshape.pos,facialpoints);
         % Add in names of the fiducials from the sensor
         headshape.fid.label = {'NASION','LPA','RPA'};
         
