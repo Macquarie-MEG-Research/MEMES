@@ -248,6 +248,40 @@ for i = 1:9
     end
 end
 
+%% Create figure to show different scaling factors
+
+if length(scaling) > 1
+    try
+        figure;hist(scaling_factor_all,length(scaling));
+        ylabel('Count/95');
+        xlabel('Scaling Parameter');
+        
+        % Get information about the same
+        % histogram by returning arguments
+        [n,x] = hist(scaling_factor_all,5);
+        % Create strings for each bar count
+        barstrings = num2str(n');
+        
+        barstrings2 = num2str(scaling');
+        
+        % Create text objects at each location
+        ylim([0 max(n)+5]);
+        text(x,n,barstrings,'horizontalalignment','center','verticalalignment','bottom');
+        
+        xticks(scaling);
+        xTick = get(gca,'xtick');
+
+        h = findobj(gca,'Type','patch');
+        h.FaceColor = [0 0.5 0.5];
+        h.EdgeColor = 'w';
+        set(gca,'FontSize',15);
+        print('scaling_factor_distribution','-dpng','-r100');
+    catch
+        disp('Cannot Display scaling factors (?)');
+    end
+end
+
+
 %% Use the best for to create a source model for MEG source analysis
 
 % winner = find(error_term == min(min(error_term)));
