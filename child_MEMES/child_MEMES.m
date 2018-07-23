@@ -85,6 +85,7 @@ switch transform_sensors
         % the transform(!)
         disp('Assuming the data has already been transformed with MEG 160');
         grad_trans = grad_con;
+        save grad_trans grad_trans
         
     case 'yes'
         % If user specified the sensors need to be transformed
