@@ -106,7 +106,6 @@ switch transform_sensors
             disp('Performing re-alignment');
             grad_trans                  = ft_transform_geometry_PFS_hacked(meg2head_transm,grad_con); %Use my hacked version of the ft function - accuracy checking removed not sure if this is good or not
             grad_trans.fid              = shape; %add in the head information
-            save grad_trans grad_trans
             
             % Else if there is a bad marker
         else
@@ -137,6 +136,11 @@ switch transform_sensors
             grad_trans                  = ft_transform_geometry_PFS_hacked(meg2head_transm,grad_con); %Use my hacked version of the ft function - accuracy checking removed not sure if this is good or not
             grad_trans.fid              = shape; %add in the head information
         end
+        
+        % Save grad_trans
+        fprintf('Saving grad_trans\n');
+        save grad_trans grad_trans
+
 end
 
 % Create figure to view relignment
