@@ -41,7 +41,7 @@ The realigned MRI can now be used to create a 3D cortical mesh of the subject's 
     mesh = ft_prepare_mesh(cfg,scalp);
     mesh = ft_convert_units(mesh,'mm');
 
-**Note 1:** You may need to alter the *cfg.scalpthreshold = 0.08* parameter for some subjects. Always plot this for quality checking and adjust the threshold as needed.
+**Note 1:** You may need to alter the *cfg.scalpthreshold = 0.08* parameter for some subjects. Always plot this for quality management and adjust the threshold as needed.
 
 **Note 2:** You can make the mesh more or less dense by altering the *cfg.numvertices = 10000* parameter. However 10,000 seems to work well for MEMES as a balance between and accuracy computational efficiency.
 
