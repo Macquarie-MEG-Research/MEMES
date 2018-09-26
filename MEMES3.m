@@ -64,7 +64,11 @@ fprintf('\nThis is MEMES v0.3\n\nMake sure you have asked Robert for an MRI libr
 % Check inputs
 disp('Performing input check');
 assert(length(bad_coil)<3,'You need at least 3 good coils for accurate alignment\n');
-assert(path_to_MRI_library(end) == '/','path_to_MRI_library needs to end with /\n');
+% If Path to MRI library doesn't end with / or \ throw up and error
+if ismember(path_to_MRI_library(end),['/','\']) == 0
+    error('!!! Path to MRI library must end with / or \ !!!');
+end
+    
 %assert(method == 'average','method = average is not yet supported. Use best\n');
 
 if length(scaling) == 1
@@ -109,10 +113,10 @@ end
 % Now try to load relevent information from the first subject
 fprintf('Now checking the MRI library is organised correctly...\n');
 try
-    load(['/Users/44737483/Documents/scripts_mcq/completed/' subject{1} '/mesh.mat']);
-    load(['/Users/44737483/Documents/scripts_mcq/completed/' subject{1} '/headmodel.mat']);
-    load(['/Users/44737483/Documents/scripts_mcq/completed/' subject{1} '/mri_realigned.mat']);
-    load(['/Users/44737483/Documents/scripts_mcq/completed/' subject{1} '/sourcemodel3d_8mm.mat']);
+    load([path_to_MRI_library subject{1} '/mesh.mat']);
+    load([path_to_MRI_library subject{1} '/headmodel.mat']);
+    load([path_to_MRI_library subject{1} '/mri_realigned.mat']);
+    load([path_to_MRI_library subject{1} '/sourcemodel3d_8mm.mat']);
     clear mesh headmodel mri_realigned sourcemodel3d
     fprintf('...Subject %s is organised correctly!\n',subject{1});
     
@@ -215,7 +219,7 @@ count = 1;
 for m = 1:length(subject)
     
     % Load the mesh
-    load(['/Users/44737483/Documents/scripts_mcq/completed/' subject{m} '/mesh.mat'])
+    load([path_to_MRI_library subject{m} '/mesh.mat'])
     
     numiter = 30; count2 = 1;
     
@@ -264,7 +268,7 @@ concat = [winners middles losers];
 % Create figure to summarise the losers,middles and winners
 figure;
 for i = 1:9
-    load(['/Users/44737483/Documents/scripts_mcq/completed/' subject{(concat(i))} '/mesh.mat'])
+    load([path_to_MRI_library subject{(concat(i))} '/mesh.mat'])
     mesh_spare = mesh;
     mesh_spare.pos = ft_warp_apply([scaling_factor_all(concat(i)) 0 0 0;...
         0 scaling_factor_all(concat(i)) 0 0; ...
@@ -482,7 +486,7 @@ switch method
         trans_matrix = trans_matrix_library{winner};
         
         % Get facial mesh of winner
-        load(['/Users/44737483/Documents/scripts_mcq/completed/' subject{winner} '/mesh.mat'])
+        load([path_to_MRI_library subject{winner} '/mesh.mat'])
         mesh_spare = mesh;
         mesh_spare.pos = ft_warp_apply([scaling_factor_all(winner) 0 0 0;0 ...
             scaling_factor_all(winner) 0 0; 0 0 scaling_factor_all(winner) 0;...
@@ -490,13 +494,13 @@ switch method
         mesh_spare.pos = ft_warp_apply(trans_matrix, mesh_spare.pos);
         
         % Get MRI of winning subject
-        mri_realigned = load(['/Users/44737483/Documents/scripts_mcq/completed/'...
+        mri_realigned = load([path_to_MRI_library...
             subject{winner} '/mri_realigned.mat']);
         
         %% Create Headmodel (in mm)
         fprintf(' Creating Headmodel in mm\n');
         
-        load(['/Users/44737483/Documents/scripts_mcq/completed/' subject{winner} '/headmodel.mat']);
+        load([path_to_MRI_library subject{winner} '/headmodel.mat']);
         
         % Scale
         headmodel.bnd.pos = ft_warp_apply([scaling_factor_all(winner) 0 0 0;0 ...
@@ -514,7 +518,7 @@ switch method
         fprintf('Creating an %dmm Sourcemodel in mm\n',sourcemodel_size);
         
         % Load specified sized sourcemodel 
-        load(['/Users/44737483/Documents/scripts_mcq/completed/' ...
+        load([path_to_MRI_library ...
             subject{winner} '/sourcemodel3d_' num2str(sourcemodel_size) 'mm.mat']);
         
         % Scale
