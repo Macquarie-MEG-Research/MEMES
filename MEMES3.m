@@ -16,7 +16,8 @@ function MEMES3(dir_name,elpfile,hspfile,confile,mrkfile,path_to_MRI_library,bad
 % - path_to_MRI_library = path to HCP MRI library
 % - mesh_library        = mesh library (in mm) created from HCP MRIs
 % - initial_mri_realign = transform for initial realigning estimate
-% - bad_coil            = list of bad coils
+% - bad_coil            = list of bad coils (up to length of 2). Enter as:
+%                         {LPAred','RPAyel','PFblue','LPFwh','RPFblack'}
 % - method              = method for creating pseudo head- and
 %                       source-model: 'best' or 'average'
 % - scaling             = scaling factor range applied to MRIs
@@ -61,14 +62,28 @@ function MEMES3(dir_name,elpfile,hspfile,confile,mrkfile,path_to_MRI_library,bad
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 fprintf('\nThis is MEMES v0.3\n\nMake sure you have asked Robert for an MRI library\n\n');
-% Check inputs
+warning('on')
+
+%% Check inputs
 disp('Performing input check');
-assert(length(bad_coil)<3,'You need at least 3 good coils for accurate alignment\n');
+assert(length(bad_coil)<3,'You need at least 3 good coils for accurate alignment. Also make sure you enter bad_coil strings in curly brackets {}');
 % If Path to MRI library doesn't end with / or \ throw up and error
 if ismember(path_to_MRI_library(end),['/','\']) == 0
     error('!!! Path to MRI library must end with / or \ !!!');
 end
-    
+
+% Check if bad_coils are entered correctly
+if strcmp(bad_coil,'')
+    disp('No bad coils marked');
+else
+    for check1 = 1:length(bad_coil)
+        if ismember(bad_coil{check1},{'','LPAred','RPAyel','PFblue','LPFwh','RPFblack'}) == 0
+            error('!!! Please enter bad_coils correctly in the form {LPAred,RPAyel,PFblue,LPFwh,RPFblack} !!!');
+        end
+    end
+end
+
+
 %assert(method == 'average','method = average is not yet supported. Use best\n');
 
 if length(scaling) == 1
@@ -89,12 +104,12 @@ end
 try
     cd(path_to_MRI_library);
     % Get a list of all files and folders in this folder.
-    files = dir(path_to_MRI_library)
-    files(1:2) = []
+    files = dir(path_to_MRI_library);
+    files(1:2) = [];
     % Get a logical vector that tells which is a directory.
-    dirFlags = [files.isdir]
+    dirFlags = [files.isdir];
     % Extract only those that are directories.
-    subFolders = files(dirFlags)
+    subFolders = files(dirFlags);
     
     % Now these names to a variable called subject
     subject = [];
@@ -107,7 +122,7 @@ try
         length(subject),subject{1}, subject{end});
     
 catch
-    fprintf('Something is wrong with your MRI library... Check the path!\n');
+    warning('Something is wrong with your MRI library... Check the path!\n');
 end
 
 % Now try to load relevent information from the first subject
@@ -121,8 +136,8 @@ try
     fprintf('...Subject %s is organised correctly!\n',subject{1});
     
 catch
-    fprintf('\nYour MRI library is not organised correctly - each folder should contain:\n')
-    fprintf('mesh.mat, headmodel.mat, mri_realigned.mat, sourcemodel3d_8mm.mat\n');
+    warning('Your MRI library is not organised correctly');
+    disp('Each folder should contain: mesh.mat, headmodel.mat, mri_realigned.mat, sourcemodel3d_8mm.mat');
 end
 
 %% Read the relevent subject data from file
@@ -146,7 +161,7 @@ mrk      = ft_read_headshape(mrkfile,'format','yokogawa_mrk');
 mrk      = ft_convert_units(mrk,'mm'); %in mm
 
 %% Perform Realighment Using Paul's Fancy Functions
-if isempty(bad_coil)
+if strcmp(bad_coil,'')
     disp('NO BAD MARKERS');
     markers                     = mrk.fid.pos([2 3 1 4 5],:);%reorder mrk to match order in shape
     [R,T,Yf,Err]                = rot3dfit(markers,shape.fid.pnt(4:end,:));%calc rotation transform
@@ -161,24 +176,24 @@ if isempty(bad_coil)
 else
     fprintf(''); disp('TAKING OUT BAD MARKER(S)');
     
+    badcoilpos = [];
+    
     % Identify the bad coil
-    badcoilpos = find(ismember(shape.fid.label,bad_coil{1}));
-    
-    % Take away the bad marker
-    marker_order = [2 3 1 4 5];
-    markers                     = mrk.fid.pos(marker_order,:);%reorder mrk to match order in shape
-    % Now take out the bad marker when you realign
-    markers(badcoilpos-3,:) = [];
-    
-    fids_2_use = shape.fid.pnt(4:end,:); fids_2_use(badcoilpos-3,:) = [];
-    
-    % If there is a second bad coil remove this now
-    if length(bad_coil) == 2
-        badcoilpos2 = find(ismember(shape.fid.label,bad_coil{2}));
-        markers(badcoilpos2-4,:) = [];
-        fids_2_use(badcoilpos2-4,:) = [];
+    for num_bad_coil = 1:length(bad_coil)
+        pos_of_bad_coil = find(ismember(shape.fid.label,bad_coil{num_bad_coil}))-3;
+        badcoilpos(num_bad_coil) = pos_of_bad_coil;
     end
     
+    % Re-order mrk file to match elp file
+    markers               = mrk.fid.pos([2 3 1 4 5],:);%reorder mrk to match order in shape
+    % Now take out the bad marker(s) when you realign
+    markers(badcoilpos,:) = [];
+    
+    % Get marker positions from elp file
+    fids_2_use = shape.fid.pnt(4:end,:); 
+    % Now take out the bad marker(s) when you realign
+    fids_2_use(badcoilpos,:) = [];
+
     [R,T,Yf,Err]                = rot3dfit(markers,fids_2_use);%calc rotation transform
     meg2head_transm             = [[R;T]'; 0 0 0 1];%reorganise and make 4*4 transformation matrix
     
@@ -208,7 +223,8 @@ save headshape_downsampled headshape_downsampled
 
 %% Perform ICP
 
-% Error term variable
+% Error term variable - MEMES will crash here if your MRI library path is
+% wrong..
 error_term = zeros(1,length(subject));
 % Variable to hold the transformation matrices
 trans_matrix_library = [];
