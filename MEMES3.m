@@ -193,13 +193,22 @@ else
     fids_2_use = shape.fid.pnt(4:end,:); 
     % Now take out the bad marker(s) when you realign
     fids_2_use(badcoilpos,:) = [];
-
-    [R,T,Yf,Err]                = rot3dfit(markers,fids_2_use);%calc rotation transform
-    meg2head_transm             = [[R;T]'; 0 0 0 1];%reorganise and make 4*4 transformation matrix
     
+    % If there are two bad coils use the ICP method, if only one use
+    % rot3dfit as usual
     disp('Performing re-alignment');
-    grad_trans                  = ft_transform_geometry_PFS_hacked(meg2head_transm,grad_con); %Use my hacked version of the ft function - accuracy checking removed not sure if this is good or not
-    grad_trans.fid              = shape; %add in the head information
+
+    if length(bad_coil) == 2
+        [R, T, err, dummy, info]    = icp(fids_2_use', markers','Minimize', 'point');
+        meg2head_transm             = [[R T]; 0 0 0 1];%reorganise and make 4*4 transformation matrix
+        grad_trans                  = ft_transform_geometry_PFS_hacked(meg2head_transm,grad_con); %Use my hacked version of the ft function - accuracy checking removed not sure if this is good or not
+        grad_trans.fid              = shape; %add in the head information
+    else
+        [R,T,Yf,Err]                = rot3dfit(markers,fids_2_use);%calc rotation transform
+        meg2head_transm             = [[R;T]'; 0 0 0 1];%reorganise and make 4*4 transformation matrix
+        grad_trans                  = ft_transform_geometry_PFS_hacked(meg2head_transm,grad_con); %Use my hacked version of the ft function - accuracy checking removed not sure if this is good or not
+        grad_trans.fid              = shape; %add in the head information
+    end
 end
 
 % Create figure to view relignment
