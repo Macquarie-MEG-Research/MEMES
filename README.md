@@ -1,5 +1,5 @@
 # MEMES
-**MRI Estimation for MEG Sourcespace (MEMES)** is a set of tools for estimating an appropriate structural MRI for MEG source analysis in Fieldtrip and/or SPM. 
+**MRI Estimation for MEG Sourcespace (MEMES)** is a set of tools for estimating an appropriate structural MRI for MEG source analysis in Fieldtrip and/or SPM.
 
 These set of scripts are customised for data acquired from the [Macquarie/KIT MEG laboratory](https://www.mq.edu.au/research/research-centres-groups-and-facilities/healthy-people/facilities/meg) using a 160-channel Yokogawa MEG system for adults and 125-channel Yokogawa MEG system for children.
 
@@ -21,7 +21,7 @@ The code selects the most appropriate MRI to estimate a singleshell headmodel an
 
 ### Adult MEMES
 
-Use MEMES2.m in conjunction with a database of meshes, headmodels and sourcemodels from the [Human Connectome Project (HCP)](https://db.humanconnectome.org) (MEG data).
+Use MEMES3.m in conjunction with a database of meshes, headmodels and sourcemodels from the [Human Connectome Project (HCP)](https://db.humanconnectome.org) (MEG data).
 
 The results seem promising, with only very minor differences to the patterns/peaks of source localistion compared to real anatomical MRIs
 
@@ -40,5 +40,3 @@ The results seem promising, with successful localisation of auditory tones to bi
 - Validate with larger dataset
 - Ground truth?
 - Average over first 10 (or so) best fitting MRIs?
-- Add scaling to child_MEMES
-
