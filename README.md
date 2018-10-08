@@ -1,6 +1,8 @@
 # MEMES
 **MRI Estimation for MEG Sourcespace (MEMES)** is a set of tools for estimating an appropriate structural MRI for MEG source analysis in Fieldtrip and/or SPM.
 
+[![DOI](https://zenodo.org/badge/117603642.svg)](https://zenodo.org/badge/latestdoi/117603642)
+
 These set of scripts are customised for data acquired from the [Macquarie/KIT MEG laboratory](https://www.mq.edu.au/research/research-centres-groups-and-facilities/healthy-people/facilities/meg) using a 160-channel Yokogawa MEG system for adults and 125-channel Yokogawa MEG system for children.
 
 ![MEMES](./actual_memes/3memes.png)
