@@ -516,8 +516,11 @@ switch method
         mesh_spare.pos = ft_warp_apply(trans_matrix, mesh_spare.pos);
 
         % Get MRI of winning subject
-        mri_realigned = load([path_to_MRI_library...
-            subject{winner} '/mri_realigned.mat']);
+        fprintf('Transforming the MRI\n');
+        load([path_to_MRI_library subject{winner} '/mri_realigned.mat'],'mri_realigned');
+        disp('done loading');
+        mri_realigned_MEMES = ft_transform_geometry(trans_matrix,...
+            mri_realigned);
 
         %% Create Headmodel (in mm)
         fprintf(' Creating Headmodel in mm\n');
@@ -604,6 +607,7 @@ switch method
         save trans_matrix trans_matrix
         save grad_trans grad_trans
         save sourcemodel3d sourcemodel3d
+        save mri_realigned_MEMES mri_realigned_MEMES
         %        save mesh mesh
 
 
