@@ -310,7 +310,7 @@ for i = 1:9
 
     ft_plot_headshape(headshape_downsampled);
 
-    clear mesh
+    clear mesh mesh_spare
 
     if i == 9
         print('best_middle_worst_examples','-dpng','-r100');
@@ -387,115 +387,132 @@ fprintf('\n Constructing the headmodel and sourcemodel \n');
 
 switch method
     case 'average'
-        fprintf('NOT SUPPORTED YET \n');
-        %         %% Calculate headmodel and sourcemodel over first n MRIs
-        %
-        %         average_over_n = 10; average_sourcemodel_all = []; average_mri_all = [];
-        %
-        %         average_n = find(ismember(error_term,error_term_sorted(1:average_over_n)));
-        %
-        %
-        %         for rep = 1:average_over_n
-        %
-        %             fprintf(' Getting sourcemodel %d of %d \n',rep,average_over_n);
-        %
-        %             % Get MRI of winning subject
-        %             mri_file = [path_to_MRI_library subject{average_n(rep)} '/MEG/anatomy/T1w_acpc_dc_restore.nii.gz'];
-        %
-        %             mri_orig                    = ft_read_mri(mri_file); % in mm, read in mri from DICOM
-        %             mri_orig = ft_convert_units(mri_orig,'cm'); mri_orig.coordsys = 'neuromag';
-        %
-        %             mri_orig.transform = initial_mri_realign{average_n(rep)};
-        %             mri_realigned = mri_orig;
-        %
-        %             mri_realigned = ft_transform_geometry(trans_matrix_library{average_n(rep)},mri_realigned);
-        %
-        %             average_mri_all{rep} = mri_realigned;
-        %
-        %             %% Create Sourcemodel (in cm)
-        %             fprintf(' Creating Sourcemodel in cm\n');
-        %
-        %             % Get transformation matrix to convert BTI to SPM
-        %             % (N.B. subject 1 not working?)
-        %             path_to_transform   = [path_to_MRI_library subject{average_n(rep)} '/MEG/anatomy/' subject{average_n(rep)} '_MEG_anatomy_transform.txt'];
-        %
-        %             txt = textscan(fopen(path_to_transform),'%s%s%s%s\n'); %open text file
-        %             transform.bti2spm = zeros(4);
-        %             fclose('all');
-        %
-        %             for reps = 1:4 %some jiggery-pokery to extract transform matrix from text file
-        %                 transform.bti2spm(:,reps) = str2num(strjoin(txt{1,reps}(32:35)))';
-        %             end
-        %
-        %             clear reps
-        %
-        %             path_to_sourcemodel = [path_to_MRI_library subject{average_n(rep)} '/MEG/anatomy/' subject{average_n(rep)} '_MEG_anatomy_sourcemodel_3d8mm.mat'];
-        %
-        %             % Load sourcemodel and convert to 'mm'
-        %             load(path_to_sourcemodel); sourcemodel3d = ft_convert_units(sourcemodel3d,'mm');
-        %
-        %             % Transform BTI --> MRI-space
-        %             sourcemodel3d.pos = ft_warp_apply(transform.bti2spm,sourcemodel3d.pos);
-        %
-        %             % Convert to cm
-        %             sourcemodel3d = ft_convert_units(sourcemodel3d,'cm');
-        %
-        %             % Transform 1 (MESH --> coreg via manual marking of fiducial points)
-        %             sourcemodel3d.pos = ft_warp_apply(inv(mri_orig.transform),sourcemodel3d.pos);
-        %             sourcemodel3d.pos = ft_warp_apply(initial_mri_realign{average_n(rep)},sourcemodel3d.pos);
-        %
-        %             %transform 2 (MESH --> coreg via ICP adjustment)
-        %             sourcemodel3d.pos = ft_warp_apply(trans_matrix_library{average_n(rep)},sourcemodel3d.pos);
-        %
-        %             average_sourcemodel_all{rep} = sourcemodel3d;
-        %
-        %         end
-        %
-        %         pos_headmodel = []; pos_sourcemodel = []; tri_headmodel = [];
-        %
-        %         for rep = 1:average_over_n
-        %             pos_headmodel(rep,:,:,:) = average_headmodel_all{1,rep}.bnd.pnt;
-        %             tri_headmodel(rep,:,:,:) = average_headmodel_all{1,rep}.bnd.tri;
-        %             pos_sourcemodel(rep,:,:,:) = average_sourcemodel_all{1,rep}.pos;
-        %         end
-        %
-        %         average_headmodel = average_headmodel_all{1};
-        %         average_headmodel.bnd.pnt = squeeze(mean(pos_headmodel));
-        %         average_headmodel.bnd.tri = squeeze(mean(tri_headmodel));
-        %
-        %         average_sourcemodel = average_sourcemodel_all{1};
-        %         average_headmodel.pos = squeeze(mean(pos_sourcemodel));
-        %
-        %         figure;ft_plot_vol(average_headmodel,  ...
-        %                 'facecolor', 'cortex', 'edgecolor', 'none');alpha 0.6; camlight;
-        %             ft_plot_mesh(average_sourcemodel.pos(average_sourcemodel.inside,:),'vertexsize',2);
-        %             %ft_plot_sens(grad_trans, 'style', 'r*')
-        %             %ft_plot_headshape(headshape_downsampled) %plot headshape
-        %
-        %         volume(average_headmodel_all{1,1}.bnd.pnt)
-        %
-        %
-        %         view_angle = [0 90 180 270];
-        %         figure; hold on;
-        %         for rep = 1:4
-        %             subplot(2,2,rep);%ft_plot_vol(average_headmodel,  ...
-        %                 %'facecolor', 'cortex', 'edgecolor', 'none');alpha 0.6; camlight;
-        %             ft_plot_mesh(average_sourcemodel.pos(average_sourcemodel.inside,:),'vertexsize',2);
-        %             ft_plot_sens(grad_trans, 'style', 'r*')
-        %             ft_plot_headshape(headshape_downsampled) %plot headshape
-        %             view([view_angle(rep),0]);
-        %         end
-        %
-        %         %% SAVE
-        %         fprintf('\nSaving the necessary data\n');
-        %
-        %         save average_headmodel average_headmodel
-        %         save grad_trans grad_trans
-        %         save average_sourcemodel average_sourcemodel
-        %
-        %
-        %         fprintf('\nCOMPLETED - check the output for quality control\n');
+        fprintf('USE WITH CAUTION - Still testing \n');
+        
+        % Average over how many? N=20 the best?
+        average_over_n = 20;
+        % Variable to hold average sourcemodel .pos
+        average_sourcemodel_all = [];
+        % Variable to hold average sourcemodel .pos
+        average_headmodel_all = [];
+        
+        for rep = 1:average_over_n
+            % Find the number of the nth MRI
+            winner_rep = find(ismember(error_term,error_term_sorted(rep)));
+            
+            % Update the user
+            fprintf('Loaded MRI %d of %d : %s ... Scaling factor: %.2f\n',...
+                rep,average_over_n,subject{winner_rep},...
+                scaling_factor_all(winner_rep));
 
+            % Get the transformation matrix of the winner
+            trans_matrix = trans_matrix_library{winner_rep};
+            
+            %% Get mesh
+            % Get facial mesh of 1st winner
+            if rep == 1
+                load([path_to_MRI_library subject{winner_rep} '/mesh.mat'])
+                mesh.pos = ft_warp_apply([scaling_factor_all(winner_rep) 0 0 0;0 ...
+                    scaling_factor_all(winner_rep) 0 0; 0 0 scaling_factor_all(winner_rep) 0;...
+                    0 0 0 1],mesh.pos);
+                mesh.pos = ft_warp_apply(trans_matrix, mesh.pos);
+                mesh_spare = mesh;
+            end
+            
+            clear mesh
+            
+            %% Create Headmodel (in mm)
+            load([path_to_MRI_library subject{winner_rep} '/headmodel.mat']);
+            
+            % Scale
+            headmodel.bnd.pos = ft_warp_apply([scaling_factor_all(winner_rep) 0 0 0;0 ...
+                scaling_factor_all(winner_rep) 0 0; 0 0 scaling_factor_all(winner_rep) 0; 0 0 0 1],...
+                headmodel.bnd.pos);
+            
+            % Transform (MESH --> coreg via ICP adjustment)
+            headmodel.bnd.pos = ft_warp_apply(trans_matrix,headmodel.bnd.pos);
+            
+            % Add the pos field to the array outside the loop
+            average_headmodel_all(rep,:,:) = headmodel.bnd.pos(:,:);
+            
+            % Reserve the first headmodel for later
+            if rep == 1
+                headmodel_for_outside_loop = headmodel;
+            end
+            
+            clear headmodel
+            
+            %% Create Sourcemodel (in mm)
+            
+            % Load specified sized sourcemodel
+            load([path_to_MRI_library ...
+                subject{winner_rep} '/sourcemodel3d_' num2str(sourcemodel_size) 'mm.mat']);
+            
+            % Scale
+            sourcemodel3d.pos = ft_warp_apply([scaling_factor_all(winner_rep)...
+                0 0 0;0 scaling_factor_all(winner_rep) 0 0; 0 0 ...
+                scaling_factor_all(winner_rep) 0; 0 0 0 1],sourcemodel3d.pos);
+            
+            % Transform (MESH --> coreg via ICP adjustment)
+            sourcemodel3d.pos = ft_warp_apply(trans_matrix,sourcemodel3d.pos);
+            
+            average_sourcemodel_all(rep,:,:) = sourcemodel3d.pos;
+            
+            % Reserve the first headmodel for later
+            if rep == 1
+                sourcemodel_for_outside_loop = sourcemodel3d;
+            end
+            
+            clear trans_matrix sourcemodel3d winner_rep
+            
+        end
+
+        % Average Headmodel
+        fprintf('Averaging Headmodel\n');
+        headmodel = headmodel_for_outside_loop;
+        headmodel.bnd.pos = squeeze(mean(average_headmodel_all,1));
+        
+        % Average Sourcemodel
+        fprintf('Averaging Sourcemodel\n');
+        sourcemodel3d = sourcemodel_for_outside_loop;
+        sourcemodel3d.pos = squeeze(mean(average_sourcemodel_all,1));
+
+        % Create figure to check headodel and sourcemodel match
+        figure;
+        ft_plot_vol(headmodel,  'facecolor', 'cortex', 'edgecolor', 'none');
+        alpha 0.4; camlight;
+        ft_plot_mesh(sourcemodel3d.pos(sourcemodel3d.inside,:),'vertexsize',5);
+        view([0 0]);
+        
+        view_angle = [0 90 180 270];
+
+        % Create figure to show final coregiration (with mesh of 1st place
+        % MRI)
+        figure; hold on;
+        for rep = 1:4
+            subplot(2,2,rep);
+            ft_plot_vol(headmodel,  'facecolor', 'cortex', 'edgecolor', 'none');alpha 0.6; camlight;
+            ft_plot_mesh(sourcemodel3d.pos(sourcemodel3d.inside,:),'vertexsize',3);
+            ft_plot_sens(grad_trans, 'style', 'r*')
+            ft_plot_headshape(headshape_downsampled) %plot headshape
+            view([view_angle(rep),0]);
+            ft_plot_mesh(mesh_spare,'facecolor',[238,206,179]./255,'EdgeColor','none','facealpha',0.5);
+            camlight; lighting phong; material dull;
+        end
+
+        print('coregistration_volumetric_quality_check','-dpng','-r100');
+        
+        %% SAVE
+        fprintf('\nSaving the necessary data\n');
+
+        save headmodel headmodel
+        %save trans_matrix trans_matrix
+        save grad_trans grad_trans
+        save sourcemodel3d sourcemodel3d
+        %save mri_realigned_MEMES mri_realigned_MEMES
+
+        fprintf('\nCOMPLETED - check the output for quality control\n');
+        
 
     case 'best'
 
@@ -575,6 +592,7 @@ switch method
         end
 
         print('coregistration_volumetric_quality_check','-dpng','-r100');
+        
 
         %         %% Create coregistered 3D cortical mesh
         %         mesh = ft_read_headshape({[path_to_MRI_library ...
