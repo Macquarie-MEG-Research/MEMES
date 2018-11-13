@@ -1,5 +1,6 @@
 
-function MEMES3(dir_name,elpfile,hspfile,confile,mrkfile,path_to_MRI_library,bad_coil,method,scaling,varargin)
+function MEMES3(dir_name,elpfile,hspfile,confile,mrkfile,...
+    path_to_MRI_library,bad_coil,method,scaling,varargin)
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % MRI Estimation for MEG Sourcespace (MEMES)
@@ -17,7 +18,7 @@ function MEMES3(dir_name,elpfile,hspfile,confile,mrkfile,path_to_MRI_library,bad
 % - mesh_library        = mesh library (in mm) created from HCP MRIs
 % - initial_mri_realign = transform for initial realigning estimate
 % - bad_coil            = list of bad coils (up to length of 2). Enter as:
-%                         {LPAred','RPAyel','PFblue','LPFwh','RPFblack'}
+%                         {'LPAred','RPAyel','PFblue','LPFwh','RPFblack'}
 % - method              = method for creating pseudo head- and
 %                       source-model: 'best' or 'average'
 % - scaling             = scaling factor range applied to MRIs
@@ -107,17 +108,17 @@ try
     dirFlags = [files.isdir];
     % Extract only those that are directories.
     subFolders = files(dirFlags);
-
+    
     % Now these names to a variable called subject
     subject = [];
-
+    
     for sub = 1 : length(subFolders)
         subject{sub} = subFolders(sub).name;
     end
-
+    
     fprintf('%d subjects found in the MRI library: from %s to %s\n',...
         length(subject),subject{1}, subject{end});
-
+    
 catch
     warning('Something is wrong with your MRI library... Check the path!\n');
 end
@@ -131,7 +132,7 @@ try
     load([path_to_MRI_library subject{1} '/sourcemodel3d_8mm.mat']);
     clear mesh headmodel mri_realigned sourcemodel3d
     fprintf('...Subject %s is organised correctly!\n',subject{1});
-
+    
 catch
     warning('Your MRI library is not organised correctly');
     disp('Each folder should contain: mesh.mat, headmodel.mat, mri_realigned.mat, sourcemodel3d_8mm.mat');
@@ -163,38 +164,38 @@ if strcmp(bad_coil,'')
     markers                     = mrk.fid.pos([2 3 1 4 5],:);%reorder mrk to match order in shape
     [R,T,Yf,Err]                = rot3dfit(markers,shape.fid.pnt(4:end,:));%calc rotation transform
     meg2head_transm             = [[R;T]'; 0 0 0 1];%reorganise and make 4*4 transformation matrix
-
+    
     disp('Performing re-alignment');
     grad_trans                  = ft_transform_geometry_PFS_hacked(meg2head_transm,grad_con); %Use my hacked version of the ft function - accuracy checking removed not sure if this is good or not
     grad_trans.fid              = shape; %add in the head information
     save grad_trans grad_trans
-
+    
     % Else if there is a bad marker
 else
     fprintf(''); disp('TAKING OUT BAD MARKER(S)');
-
+    
     badcoilpos = [];
-
+    
     % Identify the bad coil
     for num_bad_coil = 1:length(bad_coil)
         pos_of_bad_coil = find(ismember(shape.fid.label,bad_coil{num_bad_coil}))-3;
         badcoilpos(num_bad_coil) = pos_of_bad_coil;
     end
-
+    
     % Re-order mrk file to match elp file
     markers               = mrk.fid.pos([2 3 1 4 5],:);%reorder mrk to match order in shape
     % Now take out the bad marker(s) when you realign
     markers(badcoilpos,:) = [];
-
+    
     % Get marker positions from elp file
     fids_2_use = shape.fid.pnt(4:end,:);
     % Now take out the bad marker(s) when you realign
     fids_2_use(badcoilpos,:) = [];
-
+    
     % If there are two bad coils use the ICP method, if only one use
     % rot3dfit as usual
     disp('Performing re-alignment');
-
+    
     if length(bad_coil) == 2
         [R, T, err, dummy, info]    = icp(fids_2_use', markers','Minimize', 'point');
         meg2head_transm             = [[R T]; 0 0 0 1];%reorganise and make 4*4 transformation matrix
@@ -239,14 +240,14 @@ count = 1;
 
 % For each subject...
 for m = 1:length(subject)
-
+    
     % Load the mesh
     load([path_to_MRI_library subject{m} '/mesh.mat'])
-
+    
     numiter = 30; count2 = 1;
-
+    
     trans_matrix_temp = []; error_2 = [];
-
+    
     % Perform ICP fit with different scaling factors
     for scale = scaling
         fprintf('Completed iteration %d of %d ; %d of %d MRIs\n',count2,length(scaling),m,length(subject));
@@ -257,19 +258,19 @@ for m = 1:length(subject)
         trans_matrix_temp{count2} = inv([real(R) real(t);0 0 0 1]);
         count2 = count2+1;
     end
-
+    
     % Find scaling factor with smallest error
     min_error = min(error_2);
     % Add error to error_term
     error_term(m) = min_error;
-
+    
     % Add transformation matrix to trans_matrix_library
     trans_matrix_library{m} = trans_matrix_temp{find(error_2==min_error)};
     % Add scaling factor
     scaling_factor_all(m) = scaling(find(error_2==min_error));
-
+    
     fprintf('Best scaling factor is %.2f\n',scaling(find(error_2==min_error)));
-
+    
     % Clear mesh for next loop
     clear mesh
 end
@@ -296,7 +297,7 @@ for i = 1:9
         0 scaling_factor_all(concat(i)) 0 0; ...
         0 0 scaling_factor_all(concat(i)) 0; 0 0 0 1],mesh_spare.pos);
     mesh_spare.pos = ft_warp_apply(trans_matrix_library{(concat(i))}, mesh_spare.pos);
-
+    
     subplot(3,3,i)
     ft_plot_mesh(mesh_spare,'facecolor',[238,206,179]./255,'EdgeColor','none','facealpha',0.8); hold on;
     camlight; hold on; view([-270,-10]);
@@ -307,11 +308,11 @@ for i = 1:9
     elseif ismember(i,7:9)
         title(sprintf('WORST: %d', error_term((concat(i)))));
     end
-
+    
     ft_plot_headshape(headshape_downsampled);
-
+    
     clear mesh mesh_spare
-
+    
     if i == 9
         print('best_middle_worst_examples','-dpng','-r100');
     end
@@ -324,22 +325,22 @@ if length(scaling) > 1
         figure;hist(scaling_factor_all,length(scaling));
         ylabel('Count');
         xlabel('Scaling Parameter');
-
+        
         % Get information about the same
         % histogram by returning arguments
         [n,x] = hist(scaling_factor_all,5);
         % Create strings for each bar count
         barstrings = num2str(n');
-
+        
         barstrings2 = num2str(scaling');
-
+        
         % Create text objects at each location
         ylim([0 max(n)+5]);
         text(x,n,barstrings,'horizontalalignment','center','verticalalignment','bottom');
-
+        
         xticks(scaling);
         xTick = get(gca,'xtick');
-
+        
         h = findobj(gca,'Type','patch');
         h.FaceColor = [0 0.5 0.5];
         h.EdgeColor = 'w';
@@ -404,7 +405,7 @@ switch method
             fprintf('Loaded MRI %d of %d : %s ... Scaling factor: %.2f\n',...
                 rep,average_over_n,subject{winner_rep},...
                 scaling_factor_all(winner_rep));
-
+            
             % Get the transformation matrix of the winner
             trans_matrix = trans_matrix_library{winner_rep};
             
@@ -466,7 +467,7 @@ switch method
             clear trans_matrix sourcemodel3d winner_rep
             
         end
-
+        
         % Average Headmodel
         fprintf('Averaging Headmodel\n');
         headmodel = headmodel_for_outside_loop;
@@ -476,7 +477,7 @@ switch method
         fprintf('Averaging Sourcemodel\n');
         sourcemodel3d = sourcemodel_for_outside_loop;
         sourcemodel3d.pos = squeeze(mean(average_sourcemodel_all,1));
-
+        
         % Create figure to check headodel and sourcemodel match
         figure;
         ft_plot_vol(headmodel,  'facecolor', 'cortex', 'edgecolor', 'none');
@@ -485,7 +486,7 @@ switch method
         view([0 0]);
         
         view_angle = [0 90 180 270];
-
+        
         % Create figure to show final coregiration (with mesh of 1st place
         % MRI)
         figure; hold on;
@@ -499,31 +500,31 @@ switch method
             ft_plot_mesh(mesh_spare,'facecolor',[238,206,179]./255,'EdgeColor','none','facealpha',0.5);
             camlight; lighting phong; material dull;
         end
-
+        
         print('coregistration_volumetric_quality_check','-dpng','-r100');
         
         %% SAVE
         fprintf('\nSaving the necessary data\n');
-
+        
         save headmodel headmodel
         %save trans_matrix trans_matrix
         save grad_trans grad_trans
         save sourcemodel3d sourcemodel3d
         %save mri_realigned_MEMES mri_realigned_MEMES
-
+        
         fprintf('\nCOMPLETED - check the output for quality control\n');
         
-
+        
     case 'best'
-
+        
         % Find the MRI with the lowest ICP error between Polhemus points
         % and 3D scalp mesh
         winner = find(error_term == min(min(error_term)));
         fprintf('\nThe winning MRI is number %d of %d : %s\n',winner,length(subject),subject{winner});
-
+        
         % Get the transformation matrix of the winner
         trans_matrix = trans_matrix_library{winner};
-
+        
         % Get facial mesh of winner
         load([path_to_MRI_library subject{winner} '/mesh.mat'])
         mesh_spare = mesh;
@@ -531,53 +532,53 @@ switch method
             scaling_factor_all(winner) 0 0; 0 0 scaling_factor_all(winner) 0;...
             0 0 0 1],mesh_spare.pos);
         mesh_spare.pos = ft_warp_apply(trans_matrix, mesh_spare.pos);
-
+        
         % Get MRI of winning subject
         fprintf('Transforming the MRI\n');
         load([path_to_MRI_library subject{winner} '/mri_realigned.mat'],'mri_realigned');
         disp('done loading');
         mri_realigned_MEMES = ft_transform_geometry(trans_matrix,...
             mri_realigned);
-
+        
         %% Create Headmodel (in mm)
         fprintf(' Creating Headmodel in mm\n');
-
+        
         load([path_to_MRI_library subject{winner} '/headmodel.mat']);
-
+        
         % Scale
         headmodel.bnd.pos = ft_warp_apply([scaling_factor_all(winner) 0 0 0;0 ...
             scaling_factor_all(winner) 0 0; 0 0 scaling_factor_all(winner) 0; 0 0 0 1],...
             headmodel.bnd.pos);
-
+        
         % Transform (MESH --> coreg via ICP adjustment)
         headmodel.bnd.pos = ft_warp_apply(trans_matrix,headmodel.bnd.pos);
-
+        
         figure;
         ft_plot_vol(headmodel);
         ft_plot_headshape(headshape_downsampled);
-
+        
         %% Create Sourcemodel (in mm)
         fprintf('Creating an %dmm Sourcemodel in mm\n',sourcemodel_size);
-
+        
         % Load specified sized sourcemodel
         load([path_to_MRI_library ...
             subject{winner} '/sourcemodel3d_' num2str(sourcemodel_size) 'mm.mat']);
-
+        
         % Scale
         sourcemodel3d.pos = ft_warp_apply([scaling_factor_all(winner) 0 0 0;0 scaling_factor_all(winner) 0 0; 0 0 scaling_factor_all(winner) 0; 0 0 0 1],sourcemodel3d.pos);
-
+        
         % Transform (MESH --> coreg via ICP adjustment)
         sourcemodel3d.pos = ft_warp_apply(trans_matrix,sourcemodel3d.pos);
-
+        
         % Create figure to check headodel and sourcemodel match
         figure;
         ft_plot_vol(headmodel,  'facecolor', 'cortex', 'edgecolor', 'none');
         alpha 0.4; camlight;
         ft_plot_mesh(sourcemodel3d.pos(sourcemodel3d.inside,:),'vertexsize',5);
         view([0 0]);
-
+        
         view_angle = [0 90 180 270];
-
+        
         % Create figure to show final coregiration
         figure; hold on;
         for rep = 1:4
@@ -590,10 +591,10 @@ switch method
             ft_plot_mesh(mesh_spare,'facecolor',[238,206,179]./255,'EdgeColor','none','facealpha',0.5);
             camlight; lighting phong; material dull;
         end
-
+        
         print('coregistration_volumetric_quality_check','-dpng','-r100');
         
-
+        
         %         %% Create coregistered 3D cortical mesh
         %         mesh = ft_read_headshape({[path_to_MRI_library ...
         %             subject{winner} '/MEG/anatomy/' subject{winner} '.L.midthickness.4k_fs_LR.surf.gii'],...
@@ -617,20 +618,20 @@ switch method
         %         ft_plot_headshape(headshape_downsampled) %plot headshape
         %         ft_plot_mesh(mesh,'facealpha',0.8); camlight; hold on; view([100 4]);
         %         print('headmodel_3D_cortical_mesh_quality','-dpng');
-
+        
         %% SAVE
         fprintf('\nSaving the necessary data\n');
-
+        
         save headmodel headmodel
         save trans_matrix trans_matrix
         save grad_trans grad_trans
         save sourcemodel3d sourcemodel3d
         save mri_realigned_MEMES mri_realigned_MEMES
         %        save mesh mesh
-
-
+        
+        
         fprintf('\nCOMPLETED - check the output for quality control\n');
-
+        
     otherwise
         fprintf('Something went wrong - did you specify *average* or *best*')
 end
@@ -647,66 +648,66 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     function [shape] = parsePolhemus(elpfile,hspfile)
-
+        
         fid1 = fopen(elpfile);
         C = fscanf(fid1,'%c');
         fclose(fid1);
-
+        
         E = regexprep(C,'\r','xx');
         E = regexprep(E,'\t','yy');
-
+        
         returnsi = strfind(E,'xx');
         tabsi = strfind(E,'yy');
         sensornamesi = strfind(E,'%N');
         fiducialsstarti = strfind(E,'%F');
         lastfidendi = strfind(E(fiducialsstarti(3):fiducialsstarti(length(fiducialsstarti))+100),'xx');
         fiducialsendi = fiducialsstarti(1)+strfind(E(fiducialsstarti(1):fiducialsstarti(length(fiducialsstarti))+lastfidendi(1)),'xx');
-
+        
         NASION = E(fiducialsstarti(1)+4:fiducialsendi(1)-2);
         NASION = regexprep(NASION,'yy','\t');
         NASION = str2num(NASION);
-
+        
         LPA = E(fiducialsstarti(2)+4:fiducialsendi(2)-2);
         LPA = regexprep(LPA,'yy','\t');
         LPA = str2num(LPA);
-
+        
         RPA = E(fiducialsstarti(3)+4:fiducialsendi(3)-2);
         RPA = regexprep(RPA,'yy','\t');
         RPA = str2num(RPA);
-
+        
         LPAredstarti = strfind(E,'LPAred');
         LPAredendi = strfind(E(LPAredstarti(1):LPAredstarti(length(LPAredstarti))+45),'xx');
         LPAred = E(LPAredstarti(1)+11:LPAredstarti(1)+LPAredendi(2)-2);
         LPAred = regexprep(LPAred,'yy','\t');
         LPAred = str2num(LPAred);
-
+        
         RPAyelstarti = strfind(E,'RPAyel');
         RPAyelendi = strfind(E(RPAyelstarti(1):RPAyelstarti(length(RPAyelstarti))+45),'xx');
         RPAyel = E(RPAyelstarti(1)+11:RPAyelstarti(1)+RPAyelendi(2)-2);
         RPAyel = regexprep(RPAyel,'yy','\t');
         RPAyel = str2num(RPAyel);
-
+        
         PFbluestarti = strfind(E,'PFblue');
         PFblueendi = strfind(E(PFbluestarti(1):PFbluestarti(length(PFbluestarti))+45),'xx');
         PFblue = E(PFbluestarti(1)+11:PFbluestarti(1)+PFblueendi(2)-2);
         PFblue = regexprep(PFblue,'yy','\t');
         PFblue = str2num(PFblue);
-
+        
         LPFwhstarti = strfind(E,'LPFwh');
         LPFwhendi = strfind(E(LPFwhstarti(1):LPFwhstarti(length(LPFwhstarti))+45),'xx');
         LPFwh = E(LPFwhstarti(1)+11:LPFwhstarti(1)+LPFwhendi(2)-2);
         LPFwh = regexprep(LPFwh,'yy','\t');
         LPFwh = str2num(LPFwh);
-
+        
         RPFblackstarti = strfind(E,'RPFblack');
         RPFblackendi = strfind(E(RPFblackstarti(1):end),'xx');
         RPFblack = E(RPFblackstarti(1)+11:RPFblackstarti(1)+RPFblackendi(2)-2);
         RPFblack = regexprep(RPFblack,'yy','\t');
         RPFblack = str2num(RPFblack);
-
+        
         allfids = [NASION;LPA;RPA;LPAred;RPAyel;PFblue;LPFwh;RPFblack];
         fidslabels = {'NASION';'LPA';'RPA';'LPAred';'RPAyel';'PFblue';'LPFwh';'RPFblack'};
-
+        
         fid2 = fopen(hspfile);
         C = fscanf(fid2,'%c');
         fclose(fid2);
@@ -714,18 +715,18 @@ end
         E = regexprep(E,'\t','yy'); %replace tabs with "yy"
         returnsi = strfind(E,'xx');
         tabsi = strfind(E,'yy');
-
+        
         headshapestarti = strfind(E,'position of digitized points');
         headshapestartii = strfind(E(headshapestarti(1):end),'xx');
         headshape = E(headshapestarti(1)+headshapestartii(2)+2:end);
         headshape = regexprep(headshape,'yy','\t');
         headshape = regexprep(headshape,'xx','');
         headshape = str2num(headshape);
-
+        
         shape.pnt = headshape;
         shape.fid.pnt = allfids;
         shape.fid.label = fidslabels;
-
+        
         %convert to BESA style coordinates so can use the .pos file or sensor
         %config from .con
         %         shape.pnt = cat(2,fliplr(shape.pnt(:,1:2)),shape.pnt(:,3)).*1000;
@@ -740,7 +741,7 @@ end
         %         shape.fid.pnt(:,2) = neg2;
         shape.unit='m';
         %        shape = ft_convert_units(shape,'cm');
-
+        
         new_name2 = ['shape.mat'];
         save (new_name2,'shape');
     end
@@ -760,7 +761,7 @@ end
         %
         % rot3dfit: Frank Evans, NHLBI/NIH, 30 November 2001
         %
-
+        
         % ROT3DFIT uses the method described by K. S. Arun, T. S. Huang,and
         % S. D. Blostein, "Least-Squares Fitting of Two 3-D Point Sets",
         % IEEE Transactions on Pattern Analysis and Machine Intelligence,
@@ -773,42 +774,42 @@ end
         %
         % Special cases, e.g. colinear and coplanar points, are not
         % implemented.
-
+        
         %error(nargchk(2,2,nargin));
         narginchk(2,2); %PFS Change to update
         if size(X,2) ~= 3, error('X must be N x 3'); end;
         if size(Y,2) ~= 3, error('Y must be N x 3'); end;
         if size(X,1) ~= size(Y,1), error('X and Y must be the same size'); end;
-
+        
         % mean correct
-
+        
         Xm = mean(X,1); X1 = X - ones(size(X,1),1)*Xm;
         Ym = mean(Y,1); Y1 = Y - ones(size(Y,1),1)*Ym;
-
+        
         % calculate best rotation using algorithm 12.4.1 from
         % G. H. Golub and C. F. van Loan, "Matrix Computations"
         % 2nd Edition, Baltimore: Johns Hopkins, 1989, p. 582.
-
+        
         XtY = (X1')*Y1;
         [U,S,V] = svd(XtY);
         R = U*(V');
-
+        
         % solve for the translation vector
-
+        
         T = Ym - Xm*R;
-
+        
         % calculate fit points
-
+        
         Yf = X*R + ones(size(X,1),1)*T;
-
+        
         % calculate the error
-
+        
         dY = Y - Yf;
         Err = norm(dY,'fro'); % must use Frobenius norm
     end
 
     function [output] = ft_transform_geometry_PFS_hacked(transform, input)
-
+        
         % FT_TRANSFORM_GEOMETRY applies a homogeneous coordinate transformation to
         % a structure with geometric information, for example a volume conduction model
         % for the head, gradiometer of electrode structure containing EEG or MEG
@@ -825,7 +826,7 @@ end
         %   output = ft_transform_geometry(transform, input)
         %
         % See also FT_WARP_APPLY, FT_HEADCOORDINATES
-
+        
         % Copyright (C) 2011, Jan-Mathijs Schoffelen
         %
         % This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
@@ -845,18 +846,18 @@ end
         %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
         %
         % $Id: ft_transform_geometry.m$
-
+        
         % flg rescaling check
         allowscaling = ~ft_senstype(input, 'meg');
-
+        
         % determine the rotation matrix
         rotation = eye(4);
         rotation(1:3,1:3) = transform(1:3,1:3);
-
+        
         if any(abs(transform(4,:)-[0 0 0 1])>100*eps)
             error('invalid transformation matrix');
         end
-
+        
         %%### get rid of this accuracy checking below as some of the transformation
         %%matricies will be a bit hairy###
         if ~allowscaling
@@ -866,19 +867,19 @@ end
             %error('only a rigid body transformation without rescaling is allowed');
             %end
         end
-
+        
         if allowscaling
             % FIXME build in a check for uniform rescaling probably do svd or so
             % FIXME insert check for nonuniform scaling, should give an error
         end
-
+        
         tfields   = {'pos' 'pnt' 'o' 'coilpos' 'chanpos' 'chanposold' 'chanposorg' 'elecpos', 'nas', 'lpa', 'rpa', 'zpoint'}; % apply rotation plus translation
         rfields   = {'ori' 'nrm'     'coilori' 'chanori' 'chanoriold' 'chanoriorg'};                                          % only apply rotation
         mfields   = {'transform'};           % plain matrix multiplication
         recfields = {'fid' 'bnd' 'orig'};    % recurse into these fields
         % the field 'r' is not included here, because it applies to a volume
         % conductor model, and scaling is not allowed, so r will not change.
-
+        
         fnames    = fieldnames(input);
         for k = 1:numel(fnames)
             if ~isempty(input.(fnames{k}))
@@ -924,7 +925,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     function rmatx=rotate_about_z(deg)
-
+        
         deg   = deg2rad(deg);
         rmatx = [cos(deg) sin(deg) 0 0;-sin(deg) cos(deg) 0 0;0 0 1 0;0 0 0 1];
     end
@@ -1002,16 +1003,16 @@ end
 
     function [headshape_downsampled] = downsample_headshape(path_to_headshape,...
             numvertices,varargin)
-
+        
         % If not specified include the facial points
         if isempty(varargin)
             include_facial_points = 'yes';
-
+            
         else
             include_facial_points = varargin{1};
         end
-
-
+        
+        
         % Get headshape
         headshape = ft_read_headshape(path_to_headshape);
         % Convert to cm
@@ -1019,14 +1020,14 @@ end
         % Convert to BESA co-ordinates
         %         headshape.pos = cat(2,fliplr(headshape.pos(:,1:2)),headshape.pos(:,3));
         %         headshape.pos(:,2) = headshape.pos(:,2).*-1;
-
+        
         % Get indices of facial points (up to 3cm above nasion)
-
+        
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         % Is 3cm the correct distance?
         % Possibly different for child system?
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
+        
         count_facialpoints = find(headshape.pos(:,3)<3);
         if isempty(count_facialpoints)
             disp('CANNOT FIND ANY FACIAL POINTS - COREG BY ICP MAY BE INACCURATE');
@@ -1035,20 +1036,20 @@ end
             rrr = 1:4:length(facialpoints);
             facialpoints = facialpoints(rrr,:); clear rrr;
         end
-
+        
         % Remove facial points for now
         headshape.pos(count_facialpoints,:) = [];
-
+        
         % Create mesh out of headshape downsampled to x points specified in the
         % function call
         cfg.numvertices = numvertices;
         cfg.method = 'headshape';
         cfg.headshape = headshape.pos;
         mesh = ft_prepare_mesh(cfg, headshape);
-
+        
         % Replace the headshape info with the mesh points
         headshape.pos = mesh.pos;
-
+        
         % Create figure for quality checking
         figure; subplot(2,2,1);ft_plot_mesh(mesh); hold on;
         title('Downsampled Mesh');
@@ -1068,8 +1069,11 @@ end
         % 'no' in function call
         if strcmp(include_facial_points,'yes')
             try
+
                 % Add the facial info back in
-                headshape.pos = vertcat(headshape.pos,facialpoints);
+                % Only include points facial points 2cm below nasion
+                headshape.pos = vertcat(headshape.pos,...
+                    facialpoints(find(facialpoints(:,3) > -2),:));
             catch
                 disp('Cannot add facial info back into headshape');
             end
@@ -1077,23 +1081,23 @@ end
             headshape.pos = headshape.pos;
             disp('Not adding facial points back into headshape');
         end
-
+        
         %Add in names of the fiducials from the sensor
         headshape.fid.label = {'NASION','LPA','RPA'};
-
+        
         % Convert fiducial points to BESA
         %         headshape.fid.pos = cat(2,fliplr(headshape.fid.pos(:,1:2)),headshape.fid.pos(:,3));
         %         headshape.fid.pos(:,2) = headshape.fid.pos(:,2).*-1;
-
+        
         % Plot for quality checking
         figure;%ft_plot_sens(sensors) %plot channel position : between the 1st and 2nd coils
         ft_plot_headshape(headshape) %plot headshape
         view(0,0);
         print('headshape_quality2','-dpdf');
-
+        
         % Export filename
         headshape_downsampled = headshape;
-
+        
     end
 
 end
