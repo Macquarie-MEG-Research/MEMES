@@ -6,15 +6,7 @@
 %
 
 
-% subject = {'2842','2851','2850','2877','2883','2890',...
-%     '2891','3010','3011','3065','3076','3088','3089','3095','3096'...
-%     ,'3128','3146','3157'};
-
-
-subject = {'2660','2708','2735','2852','2857','2870','2880','2881'...
-    ,'2925','3003','3004','3051','3072','3091'};
-
-subject = {'3076'};
+subject = {'...'};
 
 %Load template sourcemodel
 load('/Users/44737483/Documents/fieldtrip-20170501/template/sourcemodel/standard_sourcemodel3d8mm.mat');
@@ -60,26 +52,6 @@ cfg.toilim = [-1.5 -0.3];
 datapre = ft_redefinetrial(cfg, data_filtered);
 cfg.toilim = [0.3 1.5];
 datapost = ft_redefinetrial(cfg, data_filtered);
-
-%% Create leadfields in subject{i}'s brain warped to MNI space
-
-% 
-% % create the subject{i} specific grid, using the template grid that has just been created
-% cfg                = [];
-% cfg.grid.warpmni   = 'yes';
-% cfg.grid.template  = template_grid;
-% cfg.grid.nonlinear = 'yes'; % use non-linear normalization
-% cfg.mri            = mri_realigned;
-% cfg.grid.unit      ='cm';
-% cfg.inwardshift = '1.5';
-% grid               = ft_prepare_sourcemodel(cfg);
-% figure;ft_plot_mesh((grid.pos(grid.inside,:)));
-% 
-% %grid.pos(:,2) = grid.pos(:,2).*-1;
-% 
-% %grid.pos = ft_warp_apply(mri_realigned.transform,grid.pos);
-% grid.pos = ft_warp_apply(trans_matrix,grid.pos);
-
 
 %% Create leadfield
 cfg = [];
@@ -134,14 +106,6 @@ cfg.headmodel=headmodel;
 sourcepreS1 = ft_sourceanalysis(cfg, avgpre);
 %Post-grating
 sourcepstS1=ft_sourceanalysis(cfg, avgpst);
-
-%If mesh
-% standard_mesh = ft_read_headshape({['/Users/44737483/Documents/scripts_mcq/HCP_restingstate/megconnectome-3.0 2/template/Conte69.R.inflated.4k_fs_LR.surf.gii'],...
-%     ['/Users/44737483/Documents/scripts_mcq/HCP_restingstate/megconnectome-3.0 2/template/Conte69.L.inflated.4k_fs_LR.surf.gii']});
-% 
-% standard_mesh = ft_convert_units(standard_mesh,'mm');
-
-% Make sure your field positions match the template grid
 
 sourcepreS1.pos=template_grid.pos; % right(?)
 sourcepstS1.pos=template_grid.pos; % right(?)

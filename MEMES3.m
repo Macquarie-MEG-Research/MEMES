@@ -51,7 +51,7 @@ function MEMES3(dir_name,elpfile,hspfile,confile,mrkfile,...
 
 % Example function call:
 % MEMES3(dir_name,elpfile,hspfile,confile,mrkfile,path_to_MRI_library,...
-% '','best',[0.98:0.01:1.02],8,'no')
+% '','best',[0.98:0.01:1.02],8,'no','rot3dfit')
 
 % I have introduced a variable scaling parameter for the MRIs to
 % help with coregistration. For example to apply -2% to +2% scaling to

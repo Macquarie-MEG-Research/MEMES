@@ -37,13 +37,6 @@ for sub = 1:length(subject)
         
         dist_MEMES_real_all(con,:,sub) = dist_MEMES_real;
         
-        
-        %     figure;
-        %     ft_plot_vol(headmodel_real,  'facecolor', 'r', 'edgecolor', 'none');alpha 0.1; camlight;
-        %     ft_plot_vol(headmodel_MEMES,  'facecolor', 'b', 'edgecolor', 'none');alpha 0.1; camlight;
-        %     title(sprintf('Subject %s . Mean error = %.3f',subject{sub},...
-        %         min(dist_MEMES_real))); drawnow;
-        %     ft_plot_headshape(headshape_downsampled);
         clear dist_MEMES_real
     end
 end

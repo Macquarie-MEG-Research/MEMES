@@ -163,10 +163,6 @@ lgd = legend({'MEMES','Average','Scaled','No Face'},'FontSize',14,...
     'Location','northeast');
 print('overlap_cluster','-dpng','-r300');
 
-
-
-
-
 figure;
 ft_plot_headshape(headshape_downsampled,'vertexsize',20);
 view([90,0]);
