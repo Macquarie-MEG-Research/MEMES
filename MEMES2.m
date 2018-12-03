@@ -6,7 +6,7 @@ function MEMES2(dir_name,elpfile,hspfile,confile,mrkfile,path_to_MRI_library,mes
 %
 %%%%%%%%%%%
 % Inputs:
-%%%%%%%%%%
+%%%%%%%%%%%
 %
 % - dir_name            = directory for saving
 % - elpfile             = path to elp file
