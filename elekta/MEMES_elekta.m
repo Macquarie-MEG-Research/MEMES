@@ -5,26 +5,34 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function MEMES(dir_name,fif_file,path_to_MRI_library,mesh_library,initial_mri_realign)
+function MEMES3_elekta(dir_name,fif_file,path_to_MRI_library,method,scaling,...
+    varargin)
 
-% list of HCP subjects
-subject = {'100307';'102816';'104012';'105923';'106521';'108323';...
-    '109123';'111514';'112920';'113922';'116524';'116726';'125525';...
-    '133019';'140117';'146129';'149741';'151526';'153732';'154532';...
-    '156334';'158136';'162026';'162935';'164636';'166438';'169040';...
-    '172029';'174841';'175237';'175540';'177746';'179245';'181232';...
-    '182840';'185442';'187547';'189349';'191033';'191437';'191841';...
-    '192641';'195041';'198653';'200109';'204521';'205119';'212318';...
-    '212823';'214524';'221319';'223929';'233326';'248339';'250427';...
-    '255639';'257845';'283543';'287248';'293748';'352132';'352738';...
-    '353740';'358144';'406836';'433839';'500222';'512835';'555348';...
-    '559053';'568963';'581450';'599671';'601127';'660951';'662551';...
-    '665254';'667056';'679770';'680957';'706040';'707749';'715950';...
-    '725751';'735148';'783462';'814649';'825048';'872764';'877168';...
-    '891667';'898176';'912447';'917255';'990366'}
+fprintf('\nThis is MEMES v0.3\n\nMake sure you have asked Robert for an MRI library\n\n');
+warning('on');
+
+%% Check inputs
+disp('Performing input check');
+% If Path to MRI library doesn't end with / or \ throw up and error
+if ismember(path_to_MRI_library(end),['/','\']) == 0
+    error('!!! Path to MRI library must end with / or \ !!!');
+end
 
 % CD to right place
 cd(dir_name); fprintf('\n CDd to the right place\n');
+
+if length(scaling) == 1
+    scaling = 1;
+end
+
+% If variable inputs are empty use defaults
+if isempty(varargin)
+    sourcemodel_size    = 8;
+    include_face        = 'yes';
+else
+    sourcemodel_size    = varargin{1};
+    include_face        = varargin{2};
+end
 
 %% Read headshape and get sensor information
 % If you have too many headshape points you may need to downsample a little
