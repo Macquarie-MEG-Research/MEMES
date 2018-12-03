@@ -6,7 +6,7 @@
 % John Richards (USC, USA) retains all copyrights to the templates.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-list_of_ages = {'...'}
+list_of_ages = {'5-0'}
 
 mesh_library = {};
 
@@ -21,7 +21,7 @@ for age = 1:length(list_of_ages)
     
     %% Load MRI with face
     mri_file_with_head = ['/Users/44737483/Documents/scripts_mcq/'...
-        'MRIDataBase_JohnRichards_USC/Preschool/Head/ANTS' list_of_ages{age}...
+        'MRIDataBase_JohnRichards_USC/Children/Head/ANTS' list_of_ages{age}...
         'Years_head.nii'];
     
     mri_orig = ft_read_mri(mri_file_with_head);
@@ -91,7 +91,7 @@ for age = 1:length(list_of_ages)
     fprintf('Loading the segmented MRI\n');
     
     mri_file_without_head = ['/Users/44737483/Documents/scripts_mcq/'...
-        'MRIDataBase_JohnRichards_USC/Preschool/Head/ANTS' list_of_ages{age}...
+        'MRIDataBase_JohnRichards_USC/Children/Head/ANTS' list_of_ages{age}...
         'Years_head_brain.nii.gz'];
     
     mri_orig2 = ft_read_mri(mri_file_without_head);
@@ -178,10 +178,10 @@ end
 
 %% Example call to child_MEMES
 
-dir_name    = '/Users/44737483/Documents/scripts_mcq/child_test/2913/'
+dir_name    = '/Users/44737483/Documents/scripts_mcq/child_test/2913/resting_state'
 elpfile     = '/Users/44737483/Documents/scripts_mcq/child_test/2913/2913_ES_ME125_2018_02_24.elp';
 hspfile     = '/Users/44737483/Documents/scripts_mcq/child_test/2913/2913_ES_ME125_2018_02_24.hsp';
-confile     = '/Users/44737483/Documents/scripts_mcq/child_test/2913/2913_ES_ME125_2018_02_24_B1.con';
+confile     = '/Users/44737483/Documents/scripts_mcq/child_test/2913/resting_state/2913_ES_ME125_2018_02_24_B2.con';
 mrkfile     = '/Users/44737483/Documents/scripts_mcq/child_test/2913/2913_ES_ME125_2018_02_24_INI.mrk';
 
 path_to_MRI_library = '/Users/44737483/Documents/scripts_mcq/MRIDataBase_JohnRichards_USC/database_for_MEMES/';

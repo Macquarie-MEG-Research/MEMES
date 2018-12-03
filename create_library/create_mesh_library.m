@@ -35,6 +35,7 @@ for i = 1:length(subject)
     
     mri_file = [path_to_MRI_library subject{i} '/MEG/anatomy/T1w_acpc_dc_restore.nii.gz'];
     
+    
     % Load in MRI
     mri_orig            = ft_read_mri(mri_file); % in mm, read in mri from DICOM
     mri_orig            = ft_convert_units(mri_orig,'mm');
