@@ -28,7 +28,11 @@ function MEMES3(dir_name,elpfile,hspfile,confile,mrkfile,...
 % sourcemodel_size      = size of sourcemodel grid (5,8 or 10mm)
 % include_face          = inclue facial points acquired during head
 %                       digitisation ('yes' = default)
-%
+% sens_coreg_method     = method used to realign MEG sensors based on 5 
+%                       marker coils. Use 'rot3dfit' or 'icp'. For some
+%                       reason the usual rot3dfit method seems to fail 
+%                       sometimes. Try using 'icp' in this case...
+
 %%%%%%%%%%%
 % Outputs:
 %%%%%%%%%%%
@@ -90,9 +94,11 @@ end
 if isempty(varargin)
     sourcemodel_size    = 8;
     include_face        = 'yes';
+    sens_coreg_method = 'rot3dfit';
 else
     sourcemodel_size    = varargin{1};
     include_face        = varargin{2};
+    sens_coreg_method   = varargin{3};
 end
 
 %% Extract subject names from your MRI library
@@ -160,14 +166,27 @@ mrk      = ft_convert_units(mrk,'mm'); %in mm
 if strcmp(bad_coil,'')
     disp('NO BAD MARKERS');
     markers                     = mrk.fid.pos([2 3 1 4 5],:);%reorder mrk to match order in shape
-    [R,T,Yf,Err]                = rot3dfit(markers,shape.fid.pnt(4:end,:));%calc rotation transform
-    meg2head_transm             = [[R;T]'; 0 0 0 1];%reorganise and make 4*4 transformation matrix
-
+    
+    % If the user specifed to use the icp sensor coregistratio approach use
+    % this...
+    if strcmp(sens_coreg_method,'icp')
+        fids_2_use = shape.fid.pnt(4:end,:);
+        % For some reason this works better with only 3 points... check to
+        % make sure this works for all?
+        [R, T, err, dummy, info]    = icp(fids_2_use(1:3,:)',...
+            markers(1:3,:)',100,'Minimize', 'point');
+        meg2head_transm             = [[R T]; 0 0 0 1];%reorganise and make 4*4 transformation matrix
+    % Otherwise use the original rot3dfit method
+    else
+        [R,T,Yf,Err]                = rot3dfit(markers,shape.fid.pnt(4:end,:));%calc rotation transform
+        meg2head_transm             = [[R;T]'; 0 0 0 1];%reorganise and make 4*4 transformation matrix
+    end
+       
     disp('Performing re-alignment');
     grad_trans                  = ft_transform_geometry_PFS_hacked(meg2head_transm,grad_con); %Use my hacked version of the ft function - accuracy checking removed not sure if this is good or not
     grad_trans.fid              = shape; %add in the head information
     save grad_trans grad_trans
-
+    
     % Else if there is a bad marker
 else
     fprintf(''); disp('TAKING OUT BAD MARKER(S)');
@@ -251,7 +270,9 @@ for m = 1:length(subject)
         fprintf('Completed iteration %d of %d ; %d of %d MRIs\n',count2,length(scaling),m,length(subject));
         mesh_coord_scaled = ft_warp_apply([scale 0 0 0;0 scale 0 0; 0 0 scale 0; 0 0 0 1],mesh.pos);
         % Perform ICP
-        [R, t, err, dummy, info] = icp(mesh_coord_scaled', headshape_downsampled.pos', numiter, 'Minimize', 'plane', 'Extrapolation', true,'WorstRejection', 0.05);
+        [R, t, err, dummy, info] = icp(mesh_coord_scaled', ...
+            headshape_downsampled.pos', numiter, 'Minimize', 'plane',...
+            'Extrapolation', true,'WorstRejection', 0.05);
         error_2(count2) = err(end);
         trans_matrix_temp{count2} = inv([real(R) real(t);0 0 0 1]);
         count2 = count2+1;
