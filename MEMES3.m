@@ -1,4 +1,3 @@
-
 function MEMES3(dir_name,elpfile,hspfile,confile,mrkfile,...
     path_to_MRI_library,bad_coil,method,scaling,varargin)
 %
@@ -51,7 +50,7 @@ function MEMES3(dir_name,elpfile,hspfile,confile,mrkfile,...
 
 % Example function call:
 % MEMES3(dir_name,elpfile,hspfile,confile,mrkfile,path_to_MRI_library,...
-% '','best',[0.98:0.01:1.02],8,'no','rot3dfit')
+% '','best',[0.98:0.01:1.02],8,'no')
 
 % I have introduced a variable scaling parameter for the MRIs to
 % help with coregistration. For example to apply -2% to +2% scaling to
@@ -173,8 +172,8 @@ if strcmp(bad_coil,'')
         fids_2_use = shape.fid.pnt(4:end,:);
         % For some reason this works better with only 3 points... check to
         % make sure this works for all?
-        [R, T, err, dummy, info]    = icp(fids_2_use(1:3,:)',...
-            markers(1:3,:)',100,'Minimize', 'point');
+        [R, T, err, dummy, info]    = icp(fids_2_use(1:5,:)',...
+            markers(1:5,:)',100,'Minimize', 'point');
         meg2head_transm             = [[R T]; 0 0 0 1];%reorganise and make 4*4 transformation matrix
     % Otherwise use the original rot3dfit method
     else
@@ -217,13 +216,24 @@ else
         [R, T, err, dummy, info]    = icp(fids_2_use', markers','Minimize', 'point');
         meg2head_transm             = [[R T]; 0 0 0 1];%reorganise and make 4*4 transformation matrix
         grad_trans                  = ft_transform_geometry_PFS_hacked(meg2head_transm,grad_con); %Use my hacked version of the ft function - accuracy checking removed not sure if this is good or not
+        
+        % Now take out the bad coil from the shape variable to prevent bad
+        % plotting - needs FIXING for 2 markers (note: Dec 18)
+        
         grad_trans.fid              = shape; %add in the head information
     else
         [R,T,Yf,Err]                = rot3dfit(markers,fids_2_use);%calc rotation transform
         meg2head_transm             = [[R;T]'; 0 0 0 1];%reorganise and make 4*4 transformation matrix
         grad_trans                  = ft_transform_geometry_PFS_hacked(meg2head_transm,grad_con); %Use my hacked version of the ft function - accuracy checking removed not sure if this is good or not
+        
+        % Now take out the bad coil from the shape variable to prevent bad
+        % plotting
+        shape.fid.pnt(badcoilpos+3,:) = [];
+        shape.fid.label(badcoilpos+3,:) = [];
         grad_trans.fid              = shape; %add in the head information
     end
+    
+    
 end
 
 % Create figure to view relignment
