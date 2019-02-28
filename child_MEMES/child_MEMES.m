@@ -24,6 +24,8 @@ function child_MEMES(dir_name,elpfile,hspfile,confile,...
 %%%%%%%%%%%%%%%%%%
 %
 % - transform_sensors = 'yes' or 'no' (default = 'no')
+% - include_face      = inclue facial points acquired during head
+%                       digitisation ('yes' = default)
 % - sens_coreg_method = method used to realign MEG sensors based on 5
 %                       marker coils. Use 'rot3dfit' or 'icp'. For some
 %                       reason the usual rot3dfit method seems to fail
@@ -62,10 +64,12 @@ function child_MEMES(dir_name,elpfile,hspfile,confile,...
 % Deal with variable inputs
 if isempty(varargin)
     transform_sensors = 'no';
+    include_face        = 'yes';
     sens_coreg_method = 'rot3dfit';
 else
     transform_sensors = varargin{1};
-    sens_coreg_method = varargin{2};
+    include_face      = varargin{2};
+    sens_coreg_method = varargin{3};
 end
 
 fprintf(['\nThis is MEMES for child MEG data v0.1\n\nMake sure you have ',...
@@ -200,7 +204,7 @@ hold on; ft_plot_sens(grad_trans); view([90, 0]);
 
 fprintf(['Downsampling headshape information to %d points whilst ',...
     'preserving facial information\n'],100);
-headshape_downsampled = downsample_headshape_child(hspfile,100);
+headshape_downsampled = downsample_headshape_child(hspfile,100,include_face);
 headshape_downsampled = ft_convert_units(headshape_downsampled,'mm'); %in mm
 disp('Saving headshape downsampled');
 save headshape_downsampled headshape_downsampled
@@ -726,7 +730,7 @@ print('coregistration_volumetric_quality_check','-dpng','-r100');
         headshape.pos = decimated_headshape;
         
         % Only include points facial points 2cm below nasion
-        rrr  = find(facialpoints(:,3) > -2);
+        %rrr  = find(facialpoints(:,3) > -2);
         
         
         % Add the facial points back in (default) or leave out if user specified
@@ -775,7 +779,7 @@ print('coregistration_volumetric_quality_check','-dpng','-r100');
             
             switch method
                 case 'gridaverage'
-                    decimated_headshape = pcdownsample(headshape_pc,'gridAverage',2);
+                    decimated_headshape = pcdownsample(headshape_pc,'gridAverage',3);
                     
                 case 'nonuniform'
                     decimated_headshape = pcdownsample(headshape_pc,...
