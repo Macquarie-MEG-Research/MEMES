@@ -1,4 +1,5 @@
-function child_MEMES(dir_name,elpfile,hspfile,confile,mrkfile,path_to_MRI_library,bad_coil,varargin)
+function child_MEMES(dir_name,elpfile,hspfile,confile,...
+    mrkfile,path_to_MRI_library,bad_coil,varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % MRI Estimation for MEG Sourcespace (MEMES) cutomised for child MEG.
 %
@@ -15,12 +16,18 @@ function child_MEMES(dir_name,elpfile,hspfile,confile,mrkfile,path_to_MRI_librar
 % - confile             = path to con file
 % - mrkfile             = path to mrk file
 % - path_to_MRI_library = path to HCP MRI library
+% - bad_coil            = list of bad coils (up to length of 2). Enter as:
+%                         {'LPAred','RPAyel','PFblue','LPFwh','RPFblack'}
 %
 %%%%%%%%%%%%%%%%%%
 % Variable Inputs:
 %%%%%%%%%%%%%%%%%%
 %
 % - transform_sensors = 'yes' or 'no' (default = 'no')
+% - sens_coreg_method = method used to realign MEG sensors based on 5
+%                       marker coils. Use 'rot3dfit' or 'icp'. For some
+%                       reason the usual rot3dfit method seems to fail
+%                       sometimes. Try using 'icp' in this case...
 %
 %%%%%%%%%%%
 % Outputs:
@@ -41,7 +48,7 @@ function child_MEMES(dir_name,elpfile,hspfile,confile,mrkfile,path_to_MRI_librar
 
 % Example function call:
 % child_MEMES(dir_name,elpfile,hspfile,confile,mrkfile,...
-% path_to_MRI_library,'no')
+% path_to_MRI_library,'no','rot3dfit')
 
 % This script estimates headmodel and sourcemodel for MEG sourcespace
 % analysis by matching polhemus points to a databsse of developmental
@@ -55,11 +62,14 @@ function child_MEMES(dir_name,elpfile,hspfile,confile,mrkfile,path_to_MRI_librar
 % Deal with variable inputs
 if isempty(varargin)
     transform_sensors = 'no';
+    sens_coreg_method = 'rot3dfit';
 else
     transform_sensors = varargin{1};
+    sens_coreg_method = varargin{2};
 end
 
-fprintf('\nThis is MEMES for child MEG data v0.1\n\nMake sure you have asked Robert for the mesh, headmodel and sourcemodel library\n\n');
+fprintf(['\nThis is MEMES for child MEG data v0.1\n\nMake sure you have ',...
+    'asked Robert for the mesh, headmodel and sourcemodel library\n\n']);
 % Check inputs
 disp('Performing input check');
 assert(length(bad_coil)<3,'You need at least 3 good coils for accurate alignment\n');
@@ -68,7 +78,7 @@ assert(path_to_MRI_library(end) == '/','path_to_MRI_library needs to end with /\
 % CD to right place
 cd(dir_name); fprintf('\nCDd to the right place\n');
 
-% % Get Polhemus Points
+% Get Polhemus Points
 disp('Reading elp and hspfile');
 [shape]  = parsePolhemus(elpfile,hspfile);
 shape   = ft_convert_units(shape,'mm');
@@ -97,50 +107,84 @@ switch transform_sensors
         mrk      = ft_convert_units(mrk,'mm'); %in mm
         
         %% Perform Realighment Using Paul's Fancy Functions
-        if isempty(bad_coil)
+        if strcmp(bad_coil,'')
             disp('NO BAD MARKERS');
             markers                     = mrk.fid.pos([2 3 1 4 5],:);%reorder mrk to match order in shape
-            [R,T,Yf,Err]                = rot3dfit(markers,shape.fid.pnt(4:end,:));%calc rotation transform
-            meg2head_transm             = [[R;T]'; 0 0 0 1];%reorganise and make 4*4 transformation matrix
+            
+            % If the user specifed to use the icp sensor coregistratio approach use
+            % this...
+            if strcmp(sens_coreg_method,'icp')
+                fids_2_use = shape.fid.pnt(4:end,:);
+                % For some reason this works better with only 3 points... check to
+                % make sure this works for all?
+                [R, T, err, dummy, info]    = icp(fids_2_use(1:5,:)',...
+                    markers(1:5,:)',100,'Minimize', 'point');
+                meg2head_transm             = [[R T]; 0 0 0 1];%reorganise and make 4*4 transformation matrix
+                % Otherwise use the original rot3dfit method
+            else
+                [R,T,Yf,Err]                = rot3dfit(markers,shape.fid.pnt(4:end,:));%calc rotation transform
+                meg2head_transm             = [[R;T]'; 0 0 0 1];%reorganise and make 4*4 transformation matrix
+            end
             
             disp('Performing re-alignment');
             grad_trans                  = ft_transform_geometry_PFS_hacked(meg2head_transm,grad_con); %Use my hacked version of the ft function - accuracy checking removed not sure if this is good or not
             grad_trans.fid              = shape; %add in the head information
+            save grad_trans grad_trans
             
             % Else if there is a bad marker
         else
             fprintf(''); disp('TAKING OUT BAD MARKER(S)');
             
+            badcoilpos = [];
+            
             % Identify the bad coil
-            badcoilpos = find(ismember(shape.fid.label,bad_coil{1}));
-            
-            % Take away the bad marker
-            marker_order = [2 3 1 4 5];
-            markers                     = mrk.fid.pos(marker_order,:);%reorder mrk to match order in shape
-            % Now take out the bad marker when you realign
-            markers(badcoilpos-3,:) = [];
-            
-            fids_2_use = shape.fid.pnt(4:end,:); fids_2_use(badcoilpos-3,:) = [];
-            
-            % If there is a second bad coil remove this now
-            if length(bad_coil) == 2
-                badcoilpos2 = find(ismember(shape.fid.label,bad_coil{2}));
-                markers(badcoilpos2-4,:) = [];
-                fids_2_use(badcoilpos2-4,:) = [];
+            for num_bad_coil = 1:length(bad_coil)
+                pos_of_bad_coil = find(ismember(shape.fid.label,bad_coil{num_bad_coil}))-3;
+                badcoilpos(num_bad_coil) = pos_of_bad_coil;
             end
             
-            [R,T,Yf,Err]                = rot3dfit(markers,fids_2_use);%calc rotation transform
-            meg2head_transm             = [[R;T]'; 0 0 0 1];%reorganise and make 4*4 transformation matrix
+            % Re-order mrk file to match elp file
+            markers               = mrk.fid.pos([2 3 1 4 5],:);%reorder mrk to match order in shape
+            % Now take out the bad marker(s) when you realign
+            markers(badcoilpos,:) = [];
             
+            % Get marker positions from elp file
+            fids_2_use = shape.fid.pnt(4:end,:);
+            % Now take out the bad marker(s) when you realign
+            fids_2_use(badcoilpos,:) = [];
+            
+            % If there are two bad coils use the ICP method, if only one use
+            % rot3dfit as usual
             disp('Performing re-alignment');
-            grad_trans                  = ft_transform_geometry_PFS_hacked(meg2head_transm,grad_con); %Use my hacked version of the ft function - accuracy checking removed not sure if this is good or not
-            grad_trans.fid              = shape; %add in the head information
+            
+            if length(bad_coil) == 2
+                [R, T, err, dummy, info]    = icp(fids_2_use', markers','Minimize', 'point');
+                meg2head_transm             = [[R T]; 0 0 0 1];%reorganise and make 4*4 transformation matrix
+                grad_trans                  = ft_transform_geometry_PFS_hacked(meg2head_transm,grad_con); %Use my hacked version of the ft function - accuracy checking removed not sure if this is good or not
+                
+                % Now take out the bad coil from the shape variable to prevent bad
+                % plotting - needs FIXING for 2 markers (note: Dec 18)
+                
+                grad_trans.fid              = shape; %add in the head information
+            else
+                [R,T,Yf,Err]                = rot3dfit(markers,fids_2_use);%calc rotation transform
+                meg2head_transm             = [[R;T]'; 0 0 0 1];%reorganise and make 4*4 transformation matrix
+                grad_trans                  = ft_transform_geometry_PFS_hacked(meg2head_transm,grad_con); %Use my hacked version of the ft function - accuracy checking removed not sure if this is good or not
+                
+                % Now take out the bad coil from the shape variable to prevent bad
+                % plotting
+                shape.fid.pnt(badcoilpos+3,:) = [];
+                shape.fid.label(badcoilpos+3,:) = [];
+                grad_trans.fid              = shape; %add in the head information
+            end
+            
+            
         end
         
         % Save grad_trans
         fprintf('Saving grad_trans\n');
         save grad_trans grad_trans
-
+        
 end
 
 % Create figure to view relignment
@@ -154,9 +198,9 @@ hold on; ft_plot_sens(grad_trans); view([0, 0]);
 hax = subplot(2,2,4);ft_plot_headshape(shape);
 hold on; ft_plot_sens(grad_trans); view([90, 0]);
 
-fprintf('Downsampling headshape information to %d points whilst preserving facial information\n'...
-    ,100);
-headshape_downsampled = downsample_headshape(hspfile,100);
+fprintf(['Downsampling headshape information to %d points whilst ',...
+    'preserving facial information\n'],100);
+headshape_downsampled = downsample_headshape_child(hspfile,100);
 headshape_downsampled = ft_convert_units(headshape_downsampled,'mm'); %in mm
 disp('Saving headshape downsampled');
 save headshape_downsampled headshape_downsampled
@@ -598,23 +642,33 @@ print('coregistration_volumetric_quality_check','-dpng','-r100');
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-    function [headshape_downsampled] = downsample_headshape(path_to_headshape,numvertices)
+    function [headshape_downsampled] = downsample_headshape_child(path_to_headshape,...
+            numvertices,varargin)
+        
+        % If not specified include the facial points
+        if isempty(varargin)
+            include_facial_points = 'yes';
+            
+        else
+            include_facial_points = varargin{1};
+        end
+        
+        
         % Get headshape
         headshape = ft_read_headshape(path_to_headshape);
         % Convert to cm
         headshape = ft_convert_units(headshape,'cm');
-        % Convert to BESA co-ordinates
-        %         headshape.pos = cat(2,fliplr(headshape.pos(:,1:2)),headshape.pos(:,3));
-        %         headshape.pos(:,2) = headshape.pos(:,2).*-1;
+        % Save a version for later
+        headshape_orig = headshape;
         
-        % Get indices of facial points (up to 4cm above nasion)
+        % Get indices of facial points (up to 3cm above nasion)
         
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        % Is 4cm the correct distance?
+        % Is 3cm the correct distance?
         % Possibly different for child system?
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         
-        count_facialpoints = find(headshape.pos(:,3)<4);
+        count_facialpoints = find(headshape.pos(:,3)<3 & headshape.pos(:,1)>1);
         if isempty(count_facialpoints)
             disp('CANNOT FIND ANY FACIAL POINTS - COREG BY ICP MAY BE INACCURATE');
         else
@@ -626,49 +680,115 @@ print('coregistration_volumetric_quality_check','-dpng','-r100');
         % Remove facial points for now
         headshape.pos(count_facialpoints,:) = [];
         
+        % Plot the facial and head points in separate colours
+        figure;
+        ft_plot_mesh(facialpoints,'vertexcolor','r','vertexsize',10); hold on;
+        ft_plot_mesh(headshape.pos,'vertexcolor','k','vertexsize',10); hold on;
+        view([90 0]);
+        
         % Create mesh out of headshape downsampled to x points specified in the
         % function call
-        cfg.numvertices = numvertices;
+        cfg = [];
+        %cfg.numvertices = 1000;
         cfg.method = 'headshape';
         cfg.headshape = headshape.pos;
-        headshape_mesh = ft_prepare_mesh(cfg, headshape);
+        mesh = ft_prepare_mesh(cfg, headshape);
         
-        % Replace the headshape info with the mesh points
-        headshape.pos = headshape_mesh.pos;
+        %
+        [decimated_headshape] = decimate_headshape(headshape, 'gridaverage');
+        
         
         % Create figure for quality checking
-        figure; subplot(2,2,1);ft_plot_mesh(headshape_mesh); hold on;
-        title('Downsampled Mesh');
+        figure; subplot(2,2,1);ft_plot_mesh(mesh,'facecolor','k',...
+            'facealpha',0.1,'edgealpha',0); hold on;
+        ft_plot_mesh(headshape_orig.pos,'vertexcolor','r','vertexsize',2); hold on;
+        ft_plot_mesh(decimated_headshape,'vertexcolor','b','vertexsize',10); hold on;
+        view(-180,0);
+        subplot(2,2,2);ft_plot_mesh(mesh,'facecolor','k',...
+            'facealpha',0.1,'edgealpha',0); hold on;
+        ft_plot_mesh(headshape_orig.pos,'vertexcolor','r','vertexsize',2); hold on;
+        ft_plot_mesh(decimated_headshape,'vertexcolor','b','vertexsize',10); hold on;
         view(0,0);
-        subplot(2,2,2);ft_plot_mesh(headshape); hold on;
-        title('Downsampled Headshape View 1');
-        view(0,0);
-        subplot(2,2,3);ft_plot_mesh(headshape); hold on;
-        title('Downsampled Headshape View 2');
+        subplot(2,2,3);ft_plot_mesh(mesh,'facecolor','k',...
+            'facealpha',0.1,'edgealpha',0); hold on;
+        ft_plot_mesh(headshape_orig.pos,'vertexcolor','r','vertexsize',2); hold on;
+        ft_plot_mesh(decimated_headshape,'vertexcolor','b','vertexsize',10); hold on;
         view(90,0);
-        subplot(2,2,4);ft_plot_mesh(headshape); hold on;
-        title('Downsampled Headshape View 3');
-        view(180,0);
+        subplot(2,2,4);ft_plot_mesh(mesh,'facecolor','k',...
+            'facealpha',0.1,'edgealpha',0); hold on;
+        ft_plot_mesh(headshape_orig.pos,'vertexcolor','r','vertexsize',2); hold on;
+        ft_plot_mesh(decimated_headshape,'vertexcolor','b','vertexsize',10); hold on;
+        view(-90,0);
+        
         print('headshape_quality','-dpng');
         
-        % Add the facial info back in
-        headshape.pos = vertcat(headshape.pos,facialpoints);
-        % Add in names of the fiducials from the sensor
+        % Replace headshape.pos with decimated pos
+        headshape.pos = decimated_headshape;
+        
+        % Only include points facial points 2cm below nasion
+        rrr  = find(facialpoints(:,3) > -2);
+        
+        
+        % Add the facial points back in (default) or leave out if user specified
+        % 'no' in function call
+        if strcmp(include_facial_points,'yes')
+            try
+                % Add the facial info back in
+                % Only include points facial points 2cm below nasion
+                headshape.pos = vertcat(headshape.pos,...
+                    facialpoints(find(facialpoints(:,3) > -2),:));
+            catch
+                disp('Cannot add facial info back into headshape');
+            end
+        else
+            headshape.pos = headshape.pos;
+            disp('Not adding facial points back into headshape');
+        end
+        
+        %Add in names of the fiducials from the sensor
         headshape.fid.label = {'NASION','LPA','RPA'};
         
-        % Convert fiducial points to BESA
-        %         headshape.fid.pos = cat(2,fliplr(headshape.fid.pos(:,1:2)),headshape.fid.pos(:,3));
-        %         headshape.fid.pos(:,2) = headshape.fid.pos(:,2).*-1;
-        
         % Plot for quality checking
-        figure;ft_plot_headshape(headshape) %plot headshape
-        view(0,0);
-        print('headshape_quality2','-dpdf');
+        
+        view_angle = [-180, 0]
+        figure;
+        
+        for angle = 1:length(view_angle)
+            
+            subplot(1,2,angle)
+            ft_plot_headshape(headshape,'vertexcolor','k','vertexsize',12) %plot headshape
+            hold on;
+            ft_plot_headshape(headshape_orig,'vertexcolor','r','vertexsize',2) %plot headshape
+            view(view_angle(angle),10);
+        end
+        
+        print('headshape_quality2','-dpng');
+        
         
         % Export filename
         headshape_downsampled = headshape;
         
+        function [decimated_headshape] = decimate_headshape(headshape, method)
+            
+            % Convert to a pointcloud in MATLAB
+            headshape_pc = pointCloud(headshape.pos);
+            
+            switch method
+                case 'gridaverage'
+                    decimated_headshape = pcdownsample(headshape_pc,'gridAverage',2);
+                    
+                case 'nonuniform'
+                    decimated_headshape = pcdownsample(headshape_pc,...
+                        'nonuniformGridSample',20);
+            end
+            
+            decimated_headshape = decimated_headshape.Location;
+            
+        end
+        
+        
     end
+
 
 end
 
