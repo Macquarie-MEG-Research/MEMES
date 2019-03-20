@@ -54,9 +54,12 @@ for age = 1:length(list_of_ages)
     vox2head = (mri_orig.transform);
     
     % transform voxel indices to MRI head coordinates
-    head_Nas          = ft_warp_apply(vox2head, vox_Nas, 'homogenous'); % nasion
-    head_Lpa          = ft_warp_apply(vox2head, vox_Lpa, 'homogenous'); % Left preauricular
-    head_Rpa          = ft_warp_apply(vox2head, vox_Rpa, 'homogenous'); % Right preauricular
+    head_Nas          = ft_warp_apply(vox2head, vox_Nas,...
+        'homogenous'); % nasion
+    head_Lpa          = ft_warp_apply(vox2head, vox_Lpa,...
+        'homogenous'); % Left preauricular
+    head_Rpa          = ft_warp_apply(vox2head, vox_Rpa,...
+        'homogenous'); % Right preauricular
     
     % Save marked fiducials for later
     fids = [head_Nas;head_Lpa;head_Rpa];

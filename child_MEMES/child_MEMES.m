@@ -230,7 +230,7 @@ for m = 1:length(age_list)
     
     % Perform ICP
     [R, t, err, dummy, ~] = icp(mesh.pos', headshape_downsampled.pos', ...
-        numiter, 'Minimize', 'plane', 'Extrapolation', true,'WorstRejection', 0.05);
+        numiter, 'Minimize', 'plane', 'Extrapolation', true,'WorstRejection', 0.1);
     
     % Add error to error_term list
     error_term(m) = err(end);
@@ -686,7 +686,11 @@ print('coregistration_volumetric_quality_check','-dpng','-r100');
         
         % Plot the facial and head points in separate colours
         figure;
-        ft_plot_mesh(facialpoints,'vertexcolor','r','vertexsize',10); hold on;
+        if isempty(count_facialpoints)
+            disp('Not plotting any facial points')
+        else
+            ft_plot_mesh(facialpoints,'vertexcolor','r','vertexsize',10); hold on;
+        end
         ft_plot_mesh(headshape.pos,'vertexcolor','k','vertexsize',10); hold on;
         view([90 0]);
         
