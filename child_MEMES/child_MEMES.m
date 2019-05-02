@@ -1,5 +1,5 @@
-function child_MEMES(dir_name,elpfile,hspfile,confile,...
-    mrkfile,path_to_MRI_library,bad_coil,varargin)
+function child_MEMES(dir_name,grad_trans,headshape_downsampled,...
+    path_to_MRI_library)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % MRI Estimation for MEG Sourcespace (MEMES) cutomised for child MEG.
 %
@@ -61,164 +61,15 @@ function child_MEMES(dir_name,elpfile,hspfile,confile,...
 % John Richards (USC, USA) retains all copyrights to the templates.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Deal with variable inputs
-if isempty(varargin)
-    transform_sensors = 'no';
-    include_face        = 'yes';
-    sens_coreg_method = 'rot3dfit';
-else
-    transform_sensors = varargin{1};
-    include_face      = varargin{2};
-    sens_coreg_method = varargin{3};
-end
-
 fprintf(['\nThis is MEMES for child MEG data v0.1\n\nMake sure you have ',...
     'asked Robert for the mesh, headmodel and sourcemodel library\n\n']);
 % Check inputs
 disp('Performing input check');
-assert(length(bad_coil)<3,'You need at least 3 good coils for accurate alignment\n');
 assert(path_to_MRI_library(end) == '/','path_to_MRI_library needs to end with /\n');
 
 % CD to right place
 cd(dir_name); fprintf('\nCDd to the right place\n');
 
-% Get Polhemus Points
-disp('Reading elp and hspfile');
-try
-    [shape]  = parsePolhemus(elpfile,hspfile);
-    shape   = ft_convert_units(shape,'mm');
-catch
-    
-    ft_warning('ERROR');
-    disp('Did you add MQ_MEG_Scripts/tools to your MATLAB path?')
-    disp(['Download from https://github.com/',...
-        'Macquarie-MEG-Research/MQ_MEG_Scripts'])
-    disp('If you did... I cannot read the specified elp/hsp files');
-    return
-end
-
-%
-% Read the grads from the con file
-disp('Reading Sensors');
-grad_con = ft_read_sens(confile); %in cm, load grads
-grad_con = ft_convert_units(grad_con,'mm'); %in mm
-
-% Perform MEG sensor transform if specified in the
-switch transform_sensors
-    case 'no'
-        % If the sensors have aready been transformed using MEG160 then don't do
-        % the transform(!)
-        disp('Assuming the data has already been transformed with MEG 160');
-        grad_trans = grad_con;
-        save grad_trans grad_trans
-        
-    case 'yes'
-        % If user specified the sensors need to be transformed
-        disp('Transforming the data based on data in the mrk file');
-        
-        % Read mrk_file
-        disp('Reading the mrk file');
-        mrk      = ft_read_headshape(mrkfile,'format','yokogawa_mrk');
-        mrk      = ft_convert_units(mrk,'mm'); %in mm
-        
-        %% Perform Realighment Using Paul's Fancy Functions
-        if strcmp(bad_coil,'')
-            disp('NO BAD MARKERS');
-            markers                     = mrk.fid.pos([2 3 1 4 5],:);%reorder mrk to match order in shape
-            
-            % If the user specifed to use the icp sensor coregistratio approach use
-            % this...
-            if strcmp(sens_coreg_method,'icp')
-                fids_2_use = shape.fid.pnt(4:end,:);
-                % For some reason this works better with only 3 points... check to
-                % make sure this works for all?
-                [R, T, err, dummy, info]    = icp(fids_2_use(1:5,:)',...
-                    markers(1:5,:)',100,'Minimize', 'point');
-                meg2head_transm             = [[R T]; 0 0 0 1];%reorganise and make 4*4 transformation matrix
-                % Otherwise use the original rot3dfit method
-            else
-                [R,T,Yf,Err]                = rot3dfit(markers,shape.fid.pnt(4:end,:));%calc rotation transform
-                meg2head_transm             = [[R;T]'; 0 0 0 1];%reorganise and make 4*4 transformation matrix
-            end
-            
-            disp('Performing re-alignment');
-            grad_trans                  = ft_transform_geometry_PFS_hacked(meg2head_transm,grad_con); %Use my hacked version of the ft function - accuracy checking removed not sure if this is good or not
-            grad_trans.fid              = shape; %add in the head information
-            save grad_trans grad_trans
-            
-            % Else if there is a bad marker
-        else
-            fprintf(''); disp('TAKING OUT BAD MARKER(S)');
-            
-            badcoilpos = [];
-            
-            % Identify the bad coil
-            for num_bad_coil = 1:length(bad_coil)
-                pos_of_bad_coil = find(ismember(shape.fid.label,bad_coil{num_bad_coil}))-3;
-                badcoilpos(num_bad_coil) = pos_of_bad_coil;
-            end
-            
-            % Re-order mrk file to match elp file
-            markers               = mrk.fid.pos([2 3 1 4 5],:);%reorder mrk to match order in shape
-            % Now take out the bad marker(s) when you realign
-            markers(badcoilpos,:) = [];
-            
-            % Get marker positions from elp file
-            fids_2_use = shape.fid.pnt(4:end,:);
-            % Now take out the bad marker(s) when you realign
-            fids_2_use(badcoilpos,:) = [];
-            
-            % If there are two bad coils use the ICP method, if only one use
-            % rot3dfit as usual
-            disp('Performing re-alignment');
-            
-            if length(bad_coil) == 2
-                [R, T, err, dummy, info]    = icp(fids_2_use', markers','Minimize', 'point');
-                meg2head_transm             = [[R T]; 0 0 0 1];%reorganise and make 4*4 transformation matrix
-                grad_trans                  = ft_transform_geometry_PFS_hacked(meg2head_transm,grad_con); %Use my hacked version of the ft function - accuracy checking removed not sure if this is good or not
-                
-                % Now take out the bad coil from the shape variable to prevent bad
-                % plotting - needs FIXING for 2 markers (note: Dec 18)
-                
-                grad_trans.fid              = shape; %add in the head information
-            else
-                [R,T,Yf,Err]                = rot3dfit(markers,fids_2_use);%calc rotation transform
-                meg2head_transm             = [[R;T]'; 0 0 0 1];%reorganise and make 4*4 transformation matrix
-                grad_trans                  = ft_transform_geometry_PFS_hacked(meg2head_transm,grad_con); %Use my hacked version of the ft function - accuracy checking removed not sure if this is good or not
-                
-                % Now take out the bad coil from the shape variable to prevent bad
-                % plotting
-                shape.fid.pnt(badcoilpos+3,:) = [];
-                shape.fid.label(badcoilpos+3,:) = [];
-                grad_trans.fid              = shape; %add in the head information
-            end
-            
-            
-        end
-        
-        % Save grad_trans
-        fprintf('Saving grad_trans\n');
-        save grad_trans grad_trans
-        
-end
-
-% Create figure to view relignment
-hfig = figure;
-subplot(2,2,1);ft_plot_headshape(shape);
-hold on; ft_plot_sens(grad_trans); view([180, 0]);
-subplot(2,2,2);ft_plot_headshape(shape);
-hold on; ft_plot_sens(grad_trans); view([-90, 0]);
-subplot(2,2,3);ft_plot_headshape(shape);
-hold on; ft_plot_sens(grad_trans); view([0, 0]);
-hax = subplot(2,2,4);ft_plot_headshape(shape);
-hold on; ft_plot_sens(grad_trans); view([90, 0]);
-
-fprintf(['Downsampling headshape information to %d points whilst ',...
-    'preserving facial information\n'],100);
-headshape_downsampled = downsample_headshape_child(hspfile,100,include_face);
-headshape_downsampled = ft_convert_units(headshape_downsampled,'mm'); %in mm
-disp('Saving headshape downsampled');
-save headshape_downsampled headshape_downsampled
 
 %% ICP loop
 
