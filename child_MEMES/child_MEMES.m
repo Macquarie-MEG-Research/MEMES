@@ -61,8 +61,9 @@ function child_MEMES(dir_name,grad_trans,headshape_downsampled,...
 % John Richards (USC, USA) retains all copyrights to the templates.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-fprintf(['\nThis is MEMES for child MEG data v0.1\n\nMake sure you have ',...
+fprintf(['\nThis is MEMES for child MEG data v0.11\n\nMake sure you have ',...
     'asked Robert for the mesh, headmodel and sourcemodel library\n\n']);
+ft_warning('Please use new MRI library with fid information');
 % Check inputs
 disp('Performing input check');
 assert(path_to_MRI_library(end) == '/','path_to_MRI_library needs to end with /\n');
@@ -80,6 +81,7 @@ age_list = {'2-5','3-0','4-0','4-5','5-0','5-5','6-0','6-5','7-0',...
 error_term = zeros(1,length(age_list));
 % Variable to hold the transformation matrices
 trans_matrix_library = [];
+fid_matrix_library = [];
 
 % For every member of the age list..
 for m = 1:length(age_list)
@@ -87,8 +89,21 @@ for m = 1:length(age_list)
     % Load the mesh
     load([path_to_MRI_library age_list{m} '/mesh.mat'],'mesh');
     
+    % Load fiducial information
+    
+    load([path_to_MRI_library age_list{m} '/fiducials.mat']);
+    
+    [R,T,Yf,Err]                = rot3dfit(headshape_downsampled.fid.pos,...
+        fiducials);%calc rotation transform
+    meg2head_transm             = [[R;T]'; 0 0 0 1];%reorganise and make 4*4 transformation matrix
+    
+    fid_matrix_library{m} = inv(meg2head_transm);
+    
+    % Realign mesh based on fids
+    mesh.pos = ft_warp_apply(inv(meg2head_transm),mesh.pos);
+    
     % Number of iterations for the ICP algorithm
-    numiter = 30;
+    numiter = 40;
     
     % Perform ICP
     [R, t, err, dummy, ~] = icp(mesh.pos', headshape_downsampled.pos', ...
@@ -104,7 +119,7 @@ for m = 1:length(age_list)
     trans_matrix_library{m} = trans_matrix;
     
     % Clear mesh for next loop and display message
-    clear mesh R t err trans_matrix
+    clear mesh R t err trans_matrix meg2head_transm
     fprintf('Completed age %s\n',age_list{m});
     
 end
@@ -128,6 +143,7 @@ for i = 1:3
     load([path_to_MRI_library age_list{concat(i)} '/mesh.mat'])
     
     mesh_spare = mesh;
+    mesh_spare.pos = ft_warp_apply(fid_matrix_library{(concat(i))}, mesh_spare.pos);
     mesh_spare.pos = ft_warp_apply(trans_matrix_library{(concat(i))}, mesh_spare.pos);
     
     subplot(1,3,i)
@@ -154,16 +170,25 @@ xlabel('Age Template','FontSize',15);
 print('error_age','-dpng','-r100');
 
 %% Determine the winning MRI and load the facial mesh
-winner = find(error_term == min(min(error_term)));
+winner          = find(error_term == min(min(error_term)));
 fprintf('\nThe winning MRI is number %d of %d\n',winner,length(age_list));
-trans_matrix = trans_matrix_library{winner};
+trans_matrix    = trans_matrix_library{winner};
+fid_matrix      = fid_matrix_library{winner};
+
+%% Create .mat structure for trans_matrix, fid_matrix & identity of winner
+
+MEMES_output = [];
+MEMES_output.trans_matrix = trans_matrix;
+MEMES_output.fid_matrix = fid_matrix;
+MEMES_output.MRI_winner = age_list{winner};
 
 % Save the trans matrix to disk
-save trans_matrix trans_matrix
+save MEMES_output MEMES_output
 
 % Get facial mesh of winner
 load([path_to_MRI_library age_list{winner} '/mesh.mat'])
 mesh_spare = mesh;
+mesh_spare.pos = ft_warp_apply(fid_matrix, mesh_spare.pos);
 mesh_spare.pos = ft_warp_apply(trans_matrix, mesh_spare.pos);
 
 %% Create Headmodel (in mm)
@@ -175,6 +200,7 @@ path_to_headmodel = [path_to_MRI_library age_list{winner} '/headmodel.mat'];
 load(path_to_headmodel);
 
 % Transform (MESH --> coreg via ICP adjustment)
+headmodel = ft_transform_vol(fid_matrix,headmodel);
 headmodel = ft_transform_vol(trans_matrix,headmodel);
 
 % Save
@@ -195,6 +221,7 @@ load(path_to_sourcemodel);
 sourcemodel3d = ft_convert_units(sourcemodel3d,'mm');
 
 % Transform (MESH --> coreg via ICP adjustment)
+sourcemodel3d.pos = ft_warp_apply(fid_matrix,sourcemodel3d.pos);
 sourcemodel3d.pos = ft_warp_apply(trans_matrix,sourcemodel3d.pos);
 
 % Save
