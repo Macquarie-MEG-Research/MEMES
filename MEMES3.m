@@ -13,14 +13,18 @@ function MEMES3(dir_name,grad_trans,headshape_downsampled,...
 % - headshape_downsampled = headshape downsampled to 100-200 scalp points
 % - path_to_MRI_library   = path to HCP MRI library
 % - method                = method for creating pseudo head- and
-%                         source-model: 'best' or 'average'
+%                           source-model: 'best' or 'average'
 % - scaling               = scaling factor range applied to MRIs
 %
 %%%%%%%%%%%%%%%%%%
 % Variable Inputs:
 %%%%%%%%%%%%%%%%%%
 %
-% sourcemodel_size      = size of sourcemodel grid (5,8 or 10mm)
+% - sourcemodel_size      = size of sourcemodel grid (5,8 or 10mm)
+% - weight_face           = how much do you want to weight towards the  
+%                           facial information (1 = no weighting;  
+%                           10 = very high weighting. RS recommends 
+%                           weight_face = 3;
 %
 %%%%%%%%%%%
 % Outputs:
@@ -70,8 +74,15 @@ end
 % If variable inputs are empty use defaults
 if isempty(varargin)
     sourcemodel_size    = 8;
+    weight_face         = [];
 else
     sourcemodel_size    = varargin{1};
+    weight_face         = varargin{2};
+end
+
+% Convert headshape_downsampled to mm if required
+if headshape_downsampled.unit ~= 'mm'
+    headshape_downsampled = ft_convert_units(headshape_downsampled,'mm');
 end
 
 %% Extract subject names from your MRI library
@@ -130,11 +141,26 @@ trans_matrix_library = [];
 scaling_factor_all = zeros(1,length(subject));
 count = 1;
 
+% Weight towards facial information, if specified
+if ~isempty(weight_face)
+    % Find facial points
+    count_facialpoints = find(headshape_downsampled.pos(:,3)<30 &...
+        headshape_downsampled.pos(:,1)>70);
+    
+    % Create an array 
+    w = ones(size(headshape_downsampled.pos,1),1).* (1/weight_face);
+    % Replace facial points with 1
+    w(count_facialpoints) = 1;
+    weights = @(x)assignweights(x,w);
+    fprintf('Applying Weighting of %.2f \n',weight_face);
+end
+
+
 % For each subject...
 for m = 1:length(subject)
     
     % Load the mesh
-    load([path_to_MRI_library subject{m} '/mesh.mat'])
+    load([path_to_MRI_library subject{m} '/mesh.mat']);
     
     numiter = 30; count2 = 1;
     
@@ -145,9 +171,18 @@ for m = 1:length(subject)
         fprintf('Completed iteration %d of %d ; %d of %d MRIs\n',count2,length(scaling),m,length(subject));
         mesh_coord_scaled = ft_warp_apply([scale 0 0 0;0 scale 0 0; 0 0 scale 0; 0 0 0 1],mesh.pos);
         % Perform ICP
-        [R, t, err, dummy, info] = icp(mesh_coord_scaled', ...
+        % If we are applying weighting...
+        if ~isempty(weight_face)
+        [R, t, err, ~, ~] = icp(mesh_coord_scaled', ...
+            headshape_downsampled.pos', numiter, 'Minimize', 'plane',...
+            'Extrapolation', true,'Weight', weights,'WorstRejection', 0.05);
+        % If not applying weighting...
+        else
+            [R, t, err, ~, ~] = icp(mesh_coord_scaled', ...
             headshape_downsampled.pos', numiter, 'Minimize', 'plane',...
             'Extrapolation', true,'WorstRejection', 0.05);
+        end
+        
         error_2(count2) = err(end);
         trans_matrix_temp{count2} = inv([real(R) real(t);0 0 0 1]);
         count2 = count2+1;
