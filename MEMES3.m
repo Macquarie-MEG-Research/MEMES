@@ -180,7 +180,7 @@ for m = 1:length(subject)
         else
             [R, t, err, ~, ~] = icp(mesh_coord_scaled', ...
             headshape_downsampled.pos', numiter, 'Minimize', 'plane',...
-            'Extrapolation', true,'WorstRejection', 0.05);
+            'Extrapolation', true,'WorstRejection', 0.1);
         end
         
         error_2(count2) = err(end);
