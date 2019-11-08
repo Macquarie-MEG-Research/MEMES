@@ -1,5 +1,5 @@
 function child_MEMES(dir_name,grad_trans,headshape_downsampled,...
-    path_to_MRI_library)
+    path_to_MRI_library,varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % MRI Estimation for MEG Sourcespace (MEMES) cutomised for child MEG.
 %
@@ -30,7 +30,14 @@ function child_MEMES(dir_name,grad_trans,headshape_downsampled,...
 %                       marker coils. Use 'rot3dfit' or 'icp'. For some
 %                       reason the usual rot3dfit method seems to fail
 %                       sometimes. Try using 'icp' in this case...
+%%%%%%%%%%%%%%%%%%
+% Variable Inputs:
+%%%%%%%%%%%%%%%%%%
 %
+% - weight_face           = how much do you want to weight towards the  
+%                           facial information (1 = no weighting;  
+%                           10 = very high weighting. RS recommends 
+%                           weight_face = 3;
 %%%%%%%%%%%
 % Outputs:
 %%%%%%%%%%%
@@ -61,12 +68,24 @@ function child_MEMES(dir_name,grad_trans,headshape_downsampled,...
 % John Richards (USC, USA) retains all copyrights to the templates.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% Deal with variable inputs
+if isempty(varargin)
+    weight_face         = [];
+else
+    weight_face         = varargin{1};
+end
+
 fprintf(['\nThis is MEMES for child MEG data v0.11\n\nMake sure you have ',...
     'asked Robert for the mesh, headmodel and sourcemodel library\n\n']);
 ft_warning('Please use new MRI library with fid information');
 % Check inputs
 disp('Performing input check');
 assert(path_to_MRI_library(end) == '/','path_to_MRI_library needs to end with /\n');
+
+% Convert headshape_downsampled to mm if required
+if string(headshape_downsampled.unit) ~= 'mm'
+    headshape_downsampled = ft_convert_units(headshape_downsampled,'mm');
+end
 
 % CD to right place
 cd(dir_name); fprintf('\nCDd to the right place\n');
@@ -75,13 +94,38 @@ cd(dir_name); fprintf('\nCDd to the right place\n');
 %% ICP loop
 
 age_list = {'2-5','3-0','4-0','4-5','5-0','5-5','6-0','6-5','7-0',...
-    '7-5','8-0','8-5','9-0','9-5','10-0','10-5'};
+    '7-5','8-0'};
 
 % Error term variable
 error_term = zeros(1,length(age_list));
 % Variable to hold the transformation matrices
 trans_matrix_library = [];
 fid_matrix_library = [];
+
+% Weight towards facial information, if specified
+if ~isempty(weight_face)
+    % Find facial points
+    count_facialpoints = find(headshape_downsampled.pos(:,3)<25 &...
+        headshape_downsampled.pos(:,1)>60);
+    
+    % Create an array 
+    w = ones(size(headshape_downsampled.pos,1),1).* (1/weight_face);
+    % Replace facial points with 1
+    w(count_facialpoints) = 1;
+    weights = @(x)assignweights(x,w);
+    fprintf('Applying Weighting of %.2f \n',weight_face);
+    
+    try
+        hsp = headshape_downsampled.pos(count_facialpoints,:);
+        figure; ft_plot_headshape(headshape_downsampled);
+        ft_plot_mesh(hsp,'vertexcolor','k','vertexsize',20);
+        view([90 0]);
+        title({'BLACK DOT = FACIAL POINT';'Looks sensible?'})
+        clear hsp
+    catch
+    end
+    
+end
 
 % For every member of the age list..
 for m = 1:length(age_list)
@@ -106,8 +150,17 @@ for m = 1:length(age_list)
     numiter = 40;
     
     % Perform ICP
-    [R, t, err, dummy, ~] = icp(mesh.pos', headshape_downsampled.pos', ...
-        numiter, 'Minimize', 'plane', 'Extrapolation', true,'WorstRejection', 0.1);
+    % If we are applying weighting...
+        if ~isempty(weight_face)
+        [R, t, err, ~, ~] = icp(mesh.pos', ...
+            headshape_downsampled.pos', numiter, 'Minimize', 'plane',...
+            'Extrapolation', true,'Weight', weights,'WorstRejection', 0.1);
+        % If not applying weighting...
+        else
+            [R, t, err, ~, ~] = icp(mesh.pos', ...
+            headshape_downsampled.pos', numiter, 'Minimize', 'plane',...
+            'Extrapolation', true,'WorstRejection', 0.1);
+        end
     
     % Add error to error_term list
     error_term(m) = err(end);
