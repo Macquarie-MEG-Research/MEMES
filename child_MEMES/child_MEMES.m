@@ -3,33 +3,18 @@ function child_MEMES(dir_name,grad_trans,headshape_downsampled,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % MRI Estimation for MEG Sourcespace (MEMES) cutomised for child MEG.
 %
-% Written by Robert Seymour (Macquarie Univ Dept of Cognitive Science, July
-% 2018). Some sub-functions written by Associate Professor Paul Sowman.
+% Written by Robert Seymour (Macquarie Univ Dept of Cognitive Science, 2018
+% - 2019). robert.seymour@mq.edu.au
 %
 %%%%%%%%%%%
 % Inputs:
-%%%%%%%%%%
+%%%%%%%%%%%
 %
-% - dir_name            = directory for saving
-% - elpfile             = path to elp file
-% - hspfile             = path to hsp file
-% - confile             = path to con file
-% - mrkfile             = path to mrk file
-% - path_to_MRI_library = path to HCP MRI library
-% - bad_coil            = list of bad coils (up to length of 2). Enter as:
-%                         {'LPAred','RPAyel','PFblue','LPFwh','RPFblack'}
+% - dir_name              = directory for saving
+% - grad_trans            = MEG sensors realigned based on elp/mrk files
+% - headshape_downsampled = headshape downsampled to 100-200 scalp points
+% - path_to_MRI_library   = path to custom child MRI library
 %
-%%%%%%%%%%%%%%%%%%
-% Variable Inputs:
-%%%%%%%%%%%%%%%%%%
-%
-% - transform_sensors = 'yes' or 'no' (default = 'no')
-% - include_face      = inclue facial points acquired during head
-%                       digitisation ('yes' = default)
-% - sens_coreg_method = method used to realign MEG sensors based on 5
-%                       marker coils. Use 'rot3dfit' or 'icp'. For some
-%                       reason the usual rot3dfit method seems to fail
-%                       sometimes. Try using 'icp' in this case...
 %%%%%%%%%%%%%%%%%%
 % Variable Inputs:
 %%%%%%%%%%%%%%%%%%
@@ -42,22 +27,18 @@ function child_MEMES(dir_name,grad_trans,headshape_downsampled,...
 % Outputs:
 %%%%%%%%%%%
 %
-% - grad_trans              = sensors transformed to correct
-% - shape                   = headshape and fiducial information
-% - headshape_downsampled   = headshape downsampled to 100 points with facial
-%                           information preserved
-% - trans_matrix            = transformation matrix applied to headmodel
-%                           and sourcemodel
 % - sourcemodel3d           = 8mm sourcemodel warped to MNI space
 % - headmodel               = singleshell headmodel (10000 vertices)
-
+% - MEMES_output            = info about the coreg, including which MRI was
+%                           selected and 2 transformation matrices
+%
 %%%%%%%%%%%%%%%%%%%%%
 % Other Information:
 %%%%%%%%%%%%%%%%%%%%%
 
 % Example function call:
-% child_MEMES(dir_name,elpfile,hspfile,confile,mrkfile,...
-% path_to_MRI_library,'no','rot3dfit')
+% child_MEMES(dir_name,grad_trans,headshape_downsampled,...
+%    path_to_MRI_library,3)
 
 % This script estimates headmodel and sourcemodel for MEG sourcespace
 % analysis by matching polhemus points to a databsse of developmental

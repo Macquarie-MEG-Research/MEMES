@@ -36,13 +36,48 @@ Please refer to the [/create_library folder](./create_library) for more informat
 
 For participants aged 18+, please use MEMES3.m in conjunction with an appropriate MRI database. You will need to create a series of meshes, headmodels and sourcemodels yourself. Alternatovely you can request a ready-made library from [@neurofractal](http://neurofractal.github.com). Please refer to the [/create_library folder](./create_library) for more information.
 
-MEMES3 comes with various options including:
-- *bad_coil:* include any bad marker coils (KIT-Macquarie specific)
-- *method:* specifies the method for creating sourcemodels and headmodels ('best' fit; or 'average' over first 20 best-fitting MRIs). Testing is still ongoing, so use 'best' for now
-- *scaling:* I have introduced a variable scaling parameter for the MRIs to help with subjects with exceptionally large or small heads (!).
-- *sourcemodel_size:* size of sourcemodel grid (5,8 or 10mm)
-- *include_face:* include or exclude facial information from polhemus data ('yes','no'). We advise 'yes' unless your MRI library has been defaced
-- sens_coreg_method: to specific the algorithm for sensor realignment ('rot3dfit' or 'icp')
+```MATLAB 
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% MRI Estimation for MEG Sourcespace (MEMES)
+%
+%%%%%%%%%%%
+% Inputs:
+%%%%%%%%%%%
+%
+% - dir_name              = directory for saving
+% - grad_trans            = MEG sensors realigned based on elp/mrk files
+% - headshape_downsampled = headshape downsampled to 100-200 scalp points
+% - path_to_MRI_library   = path to HCP MRI library
+% - method                = method for creating pseudo head- and
+%                           source-model: 'best' or 'average' 
+% 							over first 20 best-fitting MRIs). Testing is still 
+% 							ongoing, so if unsure use 'best' for now.
+% - scaling               = scaling factor range applied to MRIs
+%
+%%%%%%%%%%%%%%%%%%
+% Variable Inputs:
+%%%%%%%%%%%%%%%%%%
+%
+% - sourcemodel_size      = size of sourcemodel grid (5,8 or 10mm)
+% - weight_face           = how much do you want to weight towards the  
+%                           facial information (1 = no weighting;  
+%                           10 = very high weighting. RS recommends 
+%                           weight_face = 3;
+%
+%%%%%%%%%%%
+% Outputs:
+%%%%%%%%%%%
+%
+% - grad_trans              = sensors transformed to correct
+% - shape                   = headshape and fiducial information
+% - headshape_downsampled   = headshape downsampled to 100 points
+% - trans_matrix            = transformation matrix applied to headmodel
+%                           and sourcemodel
+% - sourcemodel3d           = sourcemodel warped to MNI space
+% - headmodel               = singleshell headmodel (10000 vertices)
+%
+```
 
 ![Results](./test_MEMES/results_1.png)
 
@@ -50,16 +85,46 @@ MEMES3 comes with various options including:
 
 Use child_MEMES/child_MEMES.m in conjunction with a database of meshes, headmodels and sourcemodels from the [Neurodevelopmental MRI Database](http://jerlab.psych.sc.edu/NeurodevelopmentalMRIDatabase/)
 
-The results seem promising, with successful localisation of auditory tones to bilateral primary auditory cortex in a 5yo participant.
-
-![Results](./test_MEMES/results_child.png)
+```MATLAB 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% MRI Estimation for MEG Sourcespace (MEMES) cutomised for child MEG.
+%
+% Written by Robert Seymour (Macquarie Univ Dept of Cognitive Science, 2018
+% - 2019). robert.seymour@mq.edu.au
+%
+%%%%%%%%%%%
+% Inputs:
+%%%%%%%%%%%
+%
+% - dir_name              = directory for saving
+% - grad_trans            = MEG sensors realigned based on elp/mrk files
+% - headshape_downsampled = headshape downsampled to 100-200 scalp points
+% - path_to_MRI_library   = path to custom child MRI library
+%
+%%%%%%%%%%%%%%%%%%
+% Variable Inputs:
+%%%%%%%%%%%%%%%%%%
+%
+% - weight_face           = how much do you want to weight towards the  
+%                           facial information (1 = no weighting;  
+%                           10 = very high weighting. RS recommends 
+%                           weight_face = 3;
+%%%%%%%%%%%
+% Outputs:
+%%%%%%%%%%%
+%
+% - sourcemodel3d           = 8mm sourcemodel warped to MNI space
+% - headmodel               = singleshell headmodel (10000 vertices)
+% - MEMES_output            = info about the coreg, including which MRI was
+%                           selected and 2 transformation matrices
+%
+```
 
 ### How Well Does MEMES work?
 
 Good question! 
 
-
-Robert [(@neurofractal)](https://github.com/neurofractal) has done some investigation into this.
+Robert [(@neurofractal)](https://github.com/neurofractal) has done some investigation into this, for adult data
 
 #### Validation #1: Does MEMES produce sensible results?
 
