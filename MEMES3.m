@@ -21,9 +21,9 @@ function MEMES3(dir_name,grad_trans,headshape_downsampled,...
 %%%%%%%%%%%%%%%%%%
 %
 % - sourcemodel_size      = size of sourcemodel grid (5,8 or 10mm)
-% - weight_face           = how much do you want to weight towards the  
-%                           facial information (1 = no weighting;  
-%                           10 = very high weighting. RS recommends 
+% - weight_face           = how much do you want to weight towards the
+%                           facial information (1 = no weighting;
+%                           10 = very high weighting. RS recommends
 %                           weight_face = 3;
 %
 %%%%%%%%%%%
@@ -147,7 +147,7 @@ if ~isempty(weight_face)
     count_facialpoints = find(headshape_downsampled.pos(:,3)<30 &...
         headshape_downsampled.pos(:,1)>70);
     
-    % Create an array 
+    % Create an array
     w = ones(size(headshape_downsampled.pos,1),1).* (1/weight_face);
     % Replace facial points with 1
     w(count_facialpoints) = 1;
@@ -168,19 +168,25 @@ for m = 1:length(subject)
     
     % Perform ICP fit with different scaling factors
     for scale = scaling
-        fprintf('Completed iteration %d of %d ; %d of %d MRIs\n',count2,length(scaling),m,length(subject));
+        if length(scaling) == 1
+            fprintf('Completed %d of %d MRIs\n',m,length(subject));
+        else
+            fprintf('Completed iteration %d of %d ; %d of %d MRIs\n',...
+                count2,length(scaling),m,length(subject));
+        end
+        
         mesh_coord_scaled = ft_warp_apply([scale 0 0 0;0 scale 0 0; 0 0 scale 0; 0 0 0 1],mesh.pos);
         % Perform ICP
         % If we are applying weighting...
         if ~isempty(weight_face)
-        [R, t, err, ~, ~] = icp(mesh_coord_scaled', ...
-            headshape_downsampled.pos', numiter, 'Minimize', 'plane',...
-            'Extrapolation', true,'Weight', weights,'WorstRejection', 0.05);
-        % If not applying weighting...
+            [R, t, err, ~, ~] = icp(mesh_coord_scaled', ...
+                headshape_downsampled.pos', numiter, 'Minimize', 'plane',...
+                'Extrapolation', true,'Weight', weights,'WorstRejection', 0.05);
+            % If not applying weighting...
         else
             [R, t, err, ~, ~] = icp(mesh_coord_scaled', ...
-            headshape_downsampled.pos', numiter, 'Minimize', 'plane',...
-            'Extrapolation', true,'WorstRejection', 0.1);
+                headshape_downsampled.pos', numiter, 'Minimize', 'plane',...
+                'Extrapolation', true,'WorstRejection', 0.1);
         end
         
         error_2(count2) = err(end);
@@ -198,7 +204,10 @@ for m = 1:length(subject)
     % Add scaling factor
     scaling_factor_all(m) = scaling(find(error_2==min_error));
     
-    fprintf('Best scaling factor is %.2f\n',scaling(find(error_2==min_error)));
+    if length(scaling) > 1
+        fprintf('Best scaling factor is %.2f\n',...
+            scaling(find(error_2==min_error)));
+    end
     
     % Clear mesh for next loop
     clear mesh
